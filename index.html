@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d1c45" />
+    <title>SLAGO AWARDS — Голосование</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="SLAGO Awards — на главную">
+        <span class="brand-mark">S</span>
+        <span>SLAGO <i>AWARDS</i></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="status-dot"><i></i> голосование открыто</span>
+        <button id="authButton" class="discord-button">Войти через Discord</button>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">SLAGO COMMUNITY PRESENTS</p>
+          <h1>Те, кто сделал<br /><em>этот год.</em></h1>
+          <p class="intro">Выбери людей, моменты и завозы, которые заслужили остаться в истории комьюнити.</p>
+          <a href="#ballot" class="gold-button">Начать голосование <span>↓</span></a>
+        </div>
+        <div class="hero-emblem" aria-hidden="true">
+          <div class="rays"></div>
+          <div class="trophy"><span>★</span><b>SLAGO</b><small>AWARDS<br />2026</small></div>
+          <p>ВЫБОР КОМЬЮНИТИ</p>
+        </div>
+      </section>
+
+      <section class="rules-section">
+        <div class="rule-number">01</div>
+        <div><h2>Один голос —<br />один выбор.</h2></div>
+        <p>Авторизуйся через Discord, выбери по одному номинанту в каждой категории и подтверди свой бюллетень. Изменить голос после отправки нельзя.</p>
+      </section>
+
+      <section class="ballot-section" id="ballot">
+        <div class="section-heading">
+          <div><p class="eyebrow">БЮЛЛЕТЕНЬ</p><h2>Номинации</h2></div>
+          <div class="progress"><span id="progressText">0 из 9 выбрано</span><div><i id="progressBar"></i></div></div>
+        </div>
+        <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
+        <div class="submit-wrap">
+          <p id="submitHint">Выбери номинанта в каждой категории, чтобы отправить голос.</p>
+          <button id="submitVote" class="submit-button" disabled>Отправить бюллетень <span>→</span></button>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>SLAGO AWARDS 2026</span><span>СДЕЛАНО КОМЬЮНИТИ · ДЛЯ КОМЬЮНИТИ</span></footer>
+    <div id="toast" class="toast" role="status"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
