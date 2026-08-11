@@ -10,12 +10,21 @@ const FALLBACK_NOMINATIONS = [
 }));
 
 // Заполни эти значения из Supabase Dashboard → Project Settings → API.
-const SUPABASE_URL = 'PASTE_YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = 'https://cixxcrjvlgthtfhsujib.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Z71xb3gpC5_ZnuXs7PlPCg_oTpjguU5';
 const isConfigured = !SUPABASE_URL.startsWith('PASTE_') && !SUPABASE_ANON_KEY.startsWith('PASTE_');
-const supabase = isConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// Карточки не должны зависеть от загрузки CDN: если Supabase временно недоступен,
+// сайт всё равно показывает стартовые номинации.
+let supabase = null;
+if (isConfigured && window.supabase?.createClient) {
+  try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (error) {
+    console.error('Supabase не запустился:', error);
+  }
+}
 
-const state = { nominations: FALLBACK_NOMINATIONS, choices: new Map(), user: null };
+const state = { nominations: FALLBACK_NOMINATIONS, choices: new Map(), user: null, remoteNominations: false, setupMessage: '' };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const submitButton = document.querySelector('#submitVote');
@@ -29,17 +38,41 @@ function render() {
   grid.innerHTML = state.nominations.map(n => `<article class="nomination ${state.choices.has(n.id) ? 'chosen' : ''}"><span class="nomination-index">НОМИНАЦИЯ ${String(n.index).padStart(2, '0')}</span><h3>${n.title}</h3><p>Выбери одного номинанта</p><div class="person-options">${n.nominees.map((person, i) => `<button class="person ${state.choices.get(n.id) === person.id ? 'selected' : ''}" data-category="${n.id}" data-person="${person.id}">${person.name || person}</button>`).join('')}</div></article>`).join('');
   grid.querySelectorAll('.person').forEach(button => button.addEventListener('click', () => { state.choices.set(button.dataset.category, button.dataset.person); render(); }));
   const count = state.choices.size; progressText.textContent = `${count} из ${state.nominations.length} выбрано`; progressBar.style.width = `${count / state.nominations.length * 100}%`;
-  submitButton.disabled = count !== state.nominations.length || !state.user;
-  submitHint.textContent = !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери номинанта в каждой категории, чтобы отправить голос.';
+  submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations;
+  submitHint.textContent = state.setupMessage || (!state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери номинанта в каждой категории, чтобы отправить голос.');
 }
 async function loadNominations() {
   if (!supabase) return render();
   const { data, error } = await supabase.from('nominations').select('id, slug, title, sort_order, nominees(id, name, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'nominees' });
-  if (error || !data?.length) { if (error) console.warn(error.message); return render(); }
-  state.nominations = data.map((n, i) => ({ id: n.id, title: n.title, index: i + 1, nominees: (n.nominees || []).map(x => ({ id: x.id, name: x.name })) })); render();
+  if (error || !data?.length) {
+    if (error) {
+      console.warn('Ошибка загрузки бюллетеня:', error.message);
+      state.setupMessage = `Бюллетень временный: Supabase не вернул номинации (${error.message}).`;
+    } else {
+      state.setupMessage = 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
+    }
+    return render();
+  }
+  state.nominations = data.map((n, i) => ({ id: n.id, title: n.title, index: i + 1, nominees: (n.nominees || []).map(x => ({ id: x.id, name: x.name })) }));
+  state.remoteNominations = true;
+  render();
 }
 async function syncUser() { if (!supabase) return; const { data: { session } } = await supabase.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Вышел: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; render(); }
-authButton.addEventListener('click', async () => { if (!supabase) return toast('Добавь ключи Supabase в app.js — инструкция есть в README.'); if (state.user) { await supabase.auth.signOut(); toast('Вы вышли из аккаунта.'); return; } const { error } = await supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: window.location.origin + window.location.pathname } }); if (error) toast(`Ошибка входа: ${error.message}`); });
+authButton.addEventListener('click', async () => {
+  if (!supabase) return toast(isConfigured ? 'Supabase не загрузился. Запусти сайт через Live Server и обнови страницу.' : 'Добавь ключи Supabase в app.js.');
+  if (state.user) { await supabase.auth.signOut(); toast('Вы вышли из аккаунта.'); return; }
+  if (window.location.protocol === 'file:') return toast('Сначала запусти сайт через Live Server, а не двойным кликом по index.html.');
+  const { error } = await supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: window.location.href.split('#')[0] } });
+  if (error) toast(`Ошибка входа: ${error.message}`);
+});
 submitButton.addEventListener('click', async () => { if (!state.user || !supabase) return; submitButton.disabled = true; const rows = [...state.choices].map(([nomination_id, nominee_id]) => ({ nomination_id, nominee_id, voter_id: state.user.id })); const { error } = await supabase.from('votes').insert(rows); if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : `Не удалось отправить: ${error.message}`); render(); return; } toast('Голос принят. Спасибо за выбор!'); grid.querySelectorAll('.person').forEach(b => b.disabled = true); submitHint.textContent = 'Твой бюллетень уже отправлен.'; });
-if (supabase) supabase.auth.onAuthStateChange(() => syncUser());
-loadNominations(); syncUser();
+render();
+if (supabase) {
+  supabase.auth.onAuthStateChange(() => syncUser());
+  loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); });
+  syncUser().catch(error => console.warn('Не удалось проверить сессию:', error));
+} else if (isConfigured) {
+  console.warn('Библиотека Supabase не загрузилась. Показаны временные номинации.');
+  state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.';
+  render();
+}
