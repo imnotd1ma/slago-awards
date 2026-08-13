@@ -2,7 +2,7 @@ const FALLBACK_NOMINATIONS = [
   ['legend-year', 'Легенда года'], ['golden-burger', 'Премия золотого бургера'], ['doter-year', 'Дотер года'],
   ['xer-year', 'Ксер года'], ['meme-year', 'Мем года'], ['zavoz-year', 'Завоз года'],
   ['active-year', 'Актив года'], ['zavoz-year-2', 'Завоз года II'], ['toxic-year', 'Токсик года']
-].map(([id, title], index) => ({ id, title, index: index + 1, nominees: [1, 2, 3].map(number => ({ id: `${id}-placeholder-${number}`, name: '???' })) }));
+].map(([id, title], index) => ({ id, title, index: index + 1, isFeatured: index < 3, nominees: [1, 2, 3].map(number => ({ id: `${id}-placeholder-${number}`, name: '???', avatarUrl: '' })) }));
 
 const SUPABASE_URL = 'https://cixxcrjvlgthtfhsujib.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Z71xb3gpC5_ZnuXs7PlPCg_oTpjguU5';
@@ -28,6 +28,11 @@ const confirmNominee = document.querySelector('#confirmNominee');
 let toastTimer;
 
 function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]); }
+function avatarMarkup(person) {
+  const initial = escapeHTML(String(person.name || '?').trim().charAt(0).toUpperCase() || '?');
+  const url = typeof person.avatarUrl === 'string' && /^https?:\/\//i.test(person.avatarUrl) ? ` src="${escapeHTML(person.avatarUrl)}"` : '';
+  return `<span class="candidate-avatar ${url ? 'has-image' : ''}"><b>${initial}</b>${url ? `<img${url} alt="" loading="lazy">` : ''}</span>`;
+}
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3400); }
 function selectedName(choice) { return choice?.type === 'custom' ? choice.name : choice?.name; }
 function updateProgress() {
@@ -38,11 +43,14 @@ function updateProgress() {
   submitHint.textContent = state.setupMessage || (!state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Открой каждую номинацию и выбери достойного кандидата.');
 }
 function render() {
-  grid.innerHTML = state.nominations.map(nomination => {
+  const nominationCard = nomination => {
     const choice = state.choices.get(nomination.id);
     const actionText = choice ? escapeHTML(selectedName(choice)) : 'Выбрать номинанта';
-    return `<article class="nomination ${choice ? 'chosen' : ''}" style="animation-delay:${nomination.index * 45}ms"><span class="nomination-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p>${choice ? (choice.type === 'custom' ? 'Твой номинант' : 'Главный номинант') : 'Выбери одного достойного кандидата'}</p><button class="nomination-action" type="button" data-nomination="${escapeHTML(nomination.id)}"><span>${actionText}</span><span>${choice ? '✓' : '→'}</span></button></article>`;
-  }).join('');
+    return `<article class="nomination ${nomination.isFeatured ? 'nomination-featured' : ''} ${choice ? 'chosen' : ''}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p>${choice ? (choice.type === 'custom' ? 'Твой номинант' : 'Главный номинант') : 'Выбери одного достойного кандидата'}</p><button class="nomination-action" type="button" data-nomination="${escapeHTML(nomination.id)}"><span>${actionText}</span><span>${choice ? '✓' : '→'}</span></button></article>`;
+  };
+  const featured = state.nominations.filter(item => item.isFeatured);
+  const regular = state.nominations.filter(item => !item.isFeatured);
+  grid.innerHTML = `${featured.length ? `<section class="nomination-group nomination-group-featured"><div class="group-heading"><span>★</span><div><p>ВЫБОР ГОДА</p><h3>Главные номинации</h3></div></div><div class="featured-grid">${featured.map(nominationCard).join('')}</div></section>` : ''}${regular.length ? `<section class="nomination-group"><div class="group-heading"><span>✦</span><div><p>ЕЩЁ БОЛЬШЕ</p><h3>Остальные номинации</h3></div></div><div class="regular-grid">${regular.map(nominationCard).join('')}</div></section>` : ''}`;
   grid.querySelectorAll('.nomination-action').forEach(button => button.addEventListener('click', () => openModal(button.dataset.nomination)));
   updateProgress();
 }
@@ -54,7 +62,7 @@ function openModal(nominationId) {
   modalTitle.textContent = nomination.title;
   customNominee.value = choice?.type === 'custom' ? choice.name : '';
   modalError.textContent = '';
-  modalCandidates.innerHTML = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-person="${escapeHTML(person.id)}"><span>${escapeHTML(person.name)}</span><i>✓</i></button>`).join('');
+  modalCandidates.innerHTML = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-person="${escapeHTML(person.id)}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i></button>`).join('');
   modalCandidates.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
     customNominee.value = '';
     modalCandidates.querySelectorAll('.candidate').forEach(item => item.classList.toggle('selected', item === button));
@@ -79,12 +87,12 @@ confirmNominee.addEventListener('click', () => {
 });
 async function loadNominations() {
   if (!supabaseClient) return render();
-  const { data, error } = await supabaseClient.from('nominations').select('id, slug, title, sort_order, nominees(id, name, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'nominees' });
+  const { data, error } = await supabaseClient.from('nominations').select('id, slug, title, sort_order, is_featured, nominees(id, name, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'nominees' });
   if (error || !data?.length) {
     state.setupMessage = error ? `Бюллетень временный: Supabase не вернул номинации (${error.message}).` : 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
     return render();
   }
-  state.nominations = data.map((item, index) => ({ id: item.id, title: item.title, index: index + 1, nominees: (item.nominees || []).map(person => ({ id: person.id, name: person.name })) }));
+  state.nominations = data.map((item, index) => ({ id: item.id, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.nominees || []).map(person => ({ id: person.id, name: person.name, avatarUrl: person.avatar_url || '' })) }));
   state.remoteNominations = true; render();
 }
 async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; render(); }
@@ -106,3 +114,4 @@ submitButton.addEventListener('click', async () => {
 render();
 if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
+window.addEventListener('load', () => document.body.classList.add('is-ready'));

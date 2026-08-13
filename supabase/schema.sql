@@ -4,12 +4,14 @@ create table if not exists public.nominations (
   slug text not null unique,
   title text not null,
   sort_order smallint not null unique,
+  is_featured boolean not null default false,
   is_active boolean not null default true
 );
 create table if not exists public.nominees (
   id uuid primary key default gen_random_uuid(),
   nomination_id uuid not null references public.nominations(id) on delete cascade,
   name text not null,
+  avatar_url text,
   sort_order smallint not null default 1,
   unique (nomination_id, sort_order)
 );
@@ -47,10 +49,10 @@ begin
 end; $$;
 create trigger validate_vote_nominee before insert or update on public.votes for each row execute function public.ensure_matching_nominee();
 
-insert into public.nominations (slug, title, sort_order) values
-  ('legend-year', 'Легенда года', 1), ('golden-burger', 'Премия золотого бургера', 2), ('doter-year', 'Дотер года', 3),
-  ('xer-year', 'Ксер года', 4), ('meme-year', 'Мем года', 5), ('zavoz-year', 'Завоз года', 6),
-  ('active-year', 'Актив года', 7), ('zavoz-year-2', 'Завоз года II', 8), ('toxic-year', 'Токсик года', 9)
+insert into public.nominations (slug, title, sort_order, is_featured) values
+  ('legend-year', 'Легенда года', 1, true), ('golden-burger', 'Премия золотого бургера', 2, true), ('doter-year', 'Дотер года', 3, true),
+  ('xer-year', 'Ксер года', 4, false), ('meme-year', 'Мем года', 5, false), ('zavoz-year', 'Завоз года', 6, false),
+  ('active-year', 'Актив года', 7, false), ('zavoz-year-2', 'Завоз года II', 8, false), ('toxic-year', 'Токсик года', 9, false)
 on conflict (slug) do nothing;
 insert into public.nominees (nomination_id, name, sort_order)
 select id, '???', 1 from public.nominations on conflict (nomination_id, sort_order) do nothing;
