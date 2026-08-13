@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d1c45" />
+    <meta name="theme-color" content="#08163c" />
     <title>SLAGO AWARDS — Голосование</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,11 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="aurora aurora-one" aria-hidden="true"></div>
+    <div class="aurora aurora-two" aria-hidden="true"></div>
+    <div class="grid-glow" aria-hidden="true"></div>
     <div class="noise" aria-hidden="true"></div>
+
     <header class="topbar">
       <a class="brand" href="#top" aria-label="SLAGO Awards — на главную">
         <span class="brand-mark">S</span>
@@ -25,39 +29,56 @@
 
     <main id="top">
       <section class="hero">
-        <div class="hero-copy">
+        <div class="hero-copy reveal">
           <p class="eyebrow">SLAGO COMMUNITY PRESENTS</p>
           <h1>Те, кто сделал<br /><em>этот год.</em></h1>
           <p class="intro">Выбери людей, моменты и завозы, которые заслужили остаться в истории комьюнити.</p>
           <a href="#ballot" class="gold-button">Начать голосование <span>↓</span></a>
         </div>
         <div class="hero-emblem" aria-hidden="true">
-          <div class="rays"></div>
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="rays"></div>
           <div class="trophy"><span>★</span><b>SLAGO</b><small>AWARDS<br />2026</small></div>
           <p>ВЫБОР КОМЬЮНИТИ</p>
         </div>
       </section>
 
-      <section class="rules-section">
+      <section class="rules-section reveal">
         <div class="rule-number">01</div>
         <div><h2>Один голос —<br />один выбор.</h2></div>
-        <p>Авторизуйся через Discord, выбери по одному номинанту в каждой категории и подтверди свой бюллетень. Изменить голос после отправки нельзя.</p>
+        <p>Открой номинацию, выбери одного из главных кандидатов или предложи своего. Когда заполнишь бюллетень — подтверди голос одним кликом.</p>
       </section>
 
       <section class="ballot-section" id="ballot">
-        <div class="section-heading">
+        <div class="section-heading reveal">
           <div><p class="eyebrow">БЮЛЛЕТЕНЬ</p><h2>Номинации</h2></div>
           <div class="progress"><span id="progressText">0 из 9 выбрано</span><div><i id="progressBar"></i></div></div>
         </div>
         <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
-        <div class="submit-wrap">
-          <p id="submitHint">Выбери номинанта в каждой категории, чтобы отправить голос.</p>
+        <div class="submit-wrap reveal">
+          <p id="submitHint">Открой каждую номинацию и выбери достойного кандидата.</p>
           <button id="submitVote" class="submit-button" disabled>Отправить бюллетень <span>→</span></button>
         </div>
       </section>
     </main>
 
     <footer><span>SLAGO AWARDS 2026</span><span>СДЕЛАНО КОМЬЮНИТИ · ДЛЯ КОМЬЮНИТИ</span></footer>
+
+    <div id="voteModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" type="button" aria-label="Закрыть" data-close-modal>×</button>
+        <p class="eyebrow">ВЫБОР НОМИНАНТА</p>
+        <h2 id="modalTitle">Номинация</h2>
+        <p class="modal-lead">Выбери главного кандидата или добавь своего.</p>
+        <div id="modalCandidates" class="modal-candidates"></div>
+        <div class="or-divider"><span>или предложи своего</span></div>
+        <label class="custom-label" for="customNominee">Твой номинант</label>
+        <input id="customNominee" class="custom-input" maxlength="70" autocomplete="off" placeholder="Например, Никита К." />
+        <p id="modalError" class="modal-error" role="alert"></p>
+        <button id="confirmNominee" class="modal-confirm" type="button">Подтвердить выбор <span>→</span></button>
+      </section>
+    </div>
+
     <div id="toast" class="toast" role="status"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
