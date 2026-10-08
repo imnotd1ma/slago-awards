@@ -21,19 +21,13 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, choices: new Map(), user: null, remoteNominations: false, setupMessage: '', activeNomination: null };
+const state = { nominations: FALLBACK_NOMINATIONS, choices: new Map(), user: null, remoteNominations: false, setupMessage: '' };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const submitButton = document.querySelector('#submitVote');
 const progressText = document.querySelector('#progressText');
 const progressBar = document.querySelector('#progressBar');
 const submitHint = document.querySelector('#submitHint');
-const modal = document.querySelector('#voteModal');
-const modalTitle = document.querySelector('#modalTitle');
-const modalCandidates = document.querySelector('#modalCandidates');
-const customNominee = document.querySelector('#customNominee');
-const modalError = document.querySelector('#modalError');
-const confirmNominee = document.querySelector('#confirmNominee');
 let toastTimer;
 
 function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]); }
@@ -49,51 +43,34 @@ function updateProgress() {
   progressText.textContent = `${count} из ${state.nominations.length} выбрано`;
   progressBar.style.width = `${count / state.nominations.length * 100}%`;
   submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations;
-  submitHint.textContent = state.setupMessage || (!state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Открой каждую номинацию и выбери достойного кандидата.');
+  submitHint.textContent = state.setupMessage || (!state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
 }
 function render() {
   const nominationCard = nomination => {
     const choice = state.choices.get(nomination.id);
-    const actionText = choice ? escapeHTML(selectedName(choice)) : 'Выбрать номинанта';
-    return `<article class="nomination ${nomination.isFeatured ? 'nomination-featured' : ''} ${choice ? 'chosen' : ''}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p>${choice ? (choice.type === 'custom' ? 'Твой номинант' : 'Главный номинант') : 'Выбери одного достойного кандидата'}</p><button class="nomination-action" type="button" data-nomination="${escapeHTML(nomination.id)}"><span>${actionText}</span><span>${choice ? '✓' : '→'}</span></button></article>`;
+    const candidates = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-nomination="${escapeHTML(nomination.id)}" data-person="${escapeHTML(person.id)}" aria-pressed="${choice?.type === 'existing' && choice.id === person.id}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i></button>`).join('');
+    const customName = choice?.type === 'custom' ? choice.name : '';
+    return `<article class="nomination ${nomination.isFeatured ? 'nomination-featured' : ''} ${choice ? 'chosen' : ''}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного достойного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или предложи своего</label><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Имя номинанта" value="${escapeHTML(customName)}" /></article>`;
   };
   const featured = state.nominations.filter(item => item.isFeatured);
   const regular = state.nominations.filter(item => !item.isFeatured);
   grid.innerHTML = `${featured.length ? `<section class="nomination-group nomination-group-featured"><div class="group-heading"><span>★</span><div><p>ВЫБОР ГОДА</p><h3>Главные номинации</h3></div></div><div class="featured-grid">${featured.map(nominationCard).join('')}</div></section>` : ''}${regular.length ? `<section class="nomination-group"><div class="group-heading"><span>✦</span><div><p>ЕЩЁ БОЛЬШЕ</p><h3>Остальные номинации</h3></div></div><div class="regular-grid">${regular.map(nominationCard).join('')}</div></section>` : ''}`;
-  grid.querySelectorAll('.nomination-action').forEach(button => button.addEventListener('click', () => openModal(button.dataset.nomination)));
+  grid.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
+    const nomination = state.nominations.find(item => item.id === button.dataset.nomination);
+    const person = nomination?.nominees.find(item => item.id === button.dataset.person);
+    if (!nomination || !person) return;
+    state.choices.set(nomination.id, { type: 'existing', id: person.id, name: person.name });
+    render();
+  }));
+  grid.querySelectorAll('[data-custom-nomination]').forEach(input => input.addEventListener('change', () => {
+    const nominationId = input.dataset.customNomination;
+    const customName = input.value.trim().replace(/\s+/g, ' ');
+    if (customName) state.choices.set(nominationId, { type: 'custom', name: customName });
+    else if (state.choices.get(nominationId)?.type === 'custom') state.choices.delete(nominationId);
+    render();
+  }));
   updateProgress();
 }
-function openModal(nominationId) {
-  const nomination = state.nominations.find(item => item.id === nominationId);
-  if (!nomination) return;
-  state.activeNomination = nomination;
-  const choice = state.choices.get(nomination.id);
-  modalTitle.textContent = nomination.title;
-  customNominee.value = choice?.type === 'custom' ? choice.name : '';
-  modalError.textContent = '';
-  modalCandidates.innerHTML = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-person="${escapeHTML(person.id)}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i></button>`).join('');
-  modalCandidates.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
-    customNominee.value = '';
-    modalCandidates.querySelectorAll('.candidate').forEach(item => item.classList.toggle('selected', item === button));
-    modalError.textContent = '';
-  }));
-  modal.classList.add('is-open'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
-  setTimeout(() => modalCandidates.querySelector('.selected, .candidate')?.focus(), 50);
-}
-function closeModal() { modal.classList.remove('is-open'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; state.activeNomination = null; }
-document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', closeModal));
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal.classList.contains('is-open')) closeModal(); });
-customNominee.addEventListener('input', () => { if (customNominee.value.trim()) modalCandidates.querySelectorAll('.candidate').forEach(item => item.classList.remove('selected')); modalError.textContent = ''; });
-confirmNominee.addEventListener('click', () => {
-  const nomination = state.activeNomination;
-  if (!nomination) return;
-  const customName = customNominee.value.trim().replace(/\s+/g, ' ');
-  const selected = modalCandidates.querySelector('.candidate.selected');
-  if (customName) state.choices.set(nomination.id, { type: 'custom', name: customName });
-  else if (selected) { const person = nomination.nominees.find(item => item.id === selected.dataset.person); state.choices.set(nomination.id, { type: 'existing', id: person.id, name: person.name }); }
-  else { modalError.textContent = 'Выбери кандидата или напиши своего.'; return; }
-  closeModal(); render();
-});
 async function loadNominations() {
   if (!supabaseClient) return render();
   const { data, error } = await supabaseClient.from('nominations').select('id, slug, title, sort_order, is_featured, nominees(id, name, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'nominees' });
@@ -118,7 +95,7 @@ submitButton.addEventListener('click', async () => {
   const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'custom' ? choice.name : null }));
   const { error } = await supabaseClient.from('votes').insert(rows);
   if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : `Не удалось отправить: ${error.message}`); render(); return; }
-  toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.nomination-action').forEach(button => button.disabled = true);
+  toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });
 render();
 if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }

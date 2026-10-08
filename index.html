@@ -50,7 +50,7 @@
       <section class="rules-section reveal">
         <div class="rule-number">01</div>
         <div><h2>Один голос —<br />один выбор.</h2></div>
-        <p>Открой номинацию, выбери одного из главных кандидатов или предложи своего. Когда заполнишь бюллетень — подтверди голос одним кликом.</p>
+        <p>Выбери по одному кандидату в каждой номинации. Когда заполнишь бюллетень — подтверди голос одним кликом.</p>
       </section>
 
       <section class="ballot-section" id="ballot">
@@ -60,29 +60,13 @@
         </div>
         <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
         <div class="submit-wrap reveal">
-          <p id="submitHint">Открой каждую номинацию и выбери достойного кандидата.</p>
+          <p id="submitHint">Выбери кандидата в каждой номинации.</p>
           <button id="submitVote" class="submit-button" disabled>Отправить бюллетень <span>→</span></button>
         </div>
       </section>
     </main>
 
     <footer><span>SLAGO AWARDS 2026</span><span>СДЕЛАНО КОМЬЮНИТИ · ДЛЯ КОМЬЮНИТИ</span></footer>
-
-    <div id="voteModal" class="modal" aria-hidden="true">
-      <div class="modal-backdrop" data-close-modal></div>
-      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <button class="modal-close" type="button" aria-label="Закрыть" data-close-modal>×</button>
-        <p class="eyebrow">ВЫБОР НОМИНАНТА</p>
-        <h2 id="modalTitle">Номинация</h2>
-        <p class="modal-lead">Выбери главного кандидата или добавь своего.</p>
-        <div id="modalCandidates" class="modal-candidates"></div>
-        <div class="or-divider"><span>или предложи своего</span></div>
-        <label class="custom-label" for="customNominee">Твой номинант</label>
-        <input id="customNominee" class="custom-input" maxlength="70" autocomplete="off" placeholder="Например, Никита К." />
-        <p id="modalError" class="modal-error" role="alert"></p>
-        <button id="confirmNominee" class="modal-confirm" type="button">Подтвердить выбор <span>→</span></button>
-      </section>
-    </div>
 
     <div id="toast" class="toast" role="status"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
