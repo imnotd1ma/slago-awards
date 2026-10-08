@@ -72,3 +72,40 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .custom-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(248,219,149,.12); outline:0; }
 .candidate .candidate-avatar { flex-basis:58px; width:58px; height:58px; font-size:17px; }
 @media(max-width:760px) { .nomination-featured .nomination-index { margin-bottom:26px; }.nomination-candidates { grid-template-columns:repeat(2,minmax(0,1fr)); }.candidate { min-height:92px; flex-direction:row; align-items:center; gap:10px; }.candidate .candidate-avatar { flex-basis:48px; width:48px; height:48px; }.candidate-name { font-size:12px; }.candidate i { margin-left:auto; align-self:center; } }
+
+/* Full-width, seamless nominee rows */
+.ballot-section { width:100%; max-width:none; padding:90px 0 105px; }
+.ballot-section > .section-heading,.submit-wrap { max-width:1170px; margin-left:auto; margin-right:auto; }
+.nomination-grid { width:100%; }
+.nomination { min-height:0; height:auto; padding:58px 24px 64px; overflow:visible; border:0; border-top:1px solid rgba(248,219,149,.14); border-radius:0; background:transparent; box-shadow:none; text-align:center; }
+.nomination:last-child { border-bottom:1px solid rgba(248,219,149,.14); }
+.nomination:before,.nomination:after { display:none; }
+.nomination:hover { transform:none; border-color:rgba(248,219,149,.3); background:rgba(255,255,255,.012); box-shadow:none; }
+.nomination.chosen { background:linear-gradient(90deg,transparent,rgba(248,219,149,.035),transparent); }
+.nomination-index { margin:0 0 8px!important; color:rgba(248,219,149,.66)!important; font-family:Georgia,serif; font-size:13px; letter-spacing:1px; }
+.nomination h3 { max-width:none; margin:0; color:#fff1cf; font:600 34px Georgia,serif; letter-spacing:0; line-height:1.2; }
+.nomination-prompt { min-height:0!important; margin:8px 0 0!important; font-size:12px!important; }
+.nomination-candidates { width:min(1100px,100%); margin:34px auto 0; display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:26px 34px; }
+.candidate { position:relative; width:132px; min-height:0; padding:0; display:flex; flex:0 1 132px; flex-direction:column; align-items:center; justify-content:flex-start; gap:10px; border:0; background:transparent; text-align:center; }
+.candidate:hover { transform:translateY(-4px); border:0; background:transparent; }
+.candidate.selected { border:0; background:transparent; color:var(--accent); }
+.candidate .candidate-avatar { flex:0 0 120px; width:120px; height:120px; border:2px solid rgba(248,219,149,.22); background:radial-gradient(circle at 35% 25%,#5f6680,#222b48 72%); box-shadow:0 12px 34px rgba(0,0,0,.34); font-size:28px; transition:transform .2s,border-color .2s,box-shadow .2s; }
+.candidate:hover .candidate-avatar { transform:scale(1.04); }
+.candidate.selected .candidate-avatar { border-color:var(--accent); box-shadow:0 0 0 4px rgba(248,219,149,.1),0 0 32px rgba(248,219,149,.23); }
+.candidate-name { max-width:132px; color:rgba(238,239,245,.78); font-size:11px; font-weight:600; line-height:1.35; overflow-wrap:anywhere; }
+.candidate.selected .candidate-name { color:var(--accent); }
+.candidate i { position:absolute; top:5px; right:9px; z-index:2; width:25px; height:25px; display:grid; place-items:center; border-radius:50%; background:var(--accent); color:#101522; font-size:13px; font-style:normal; opacity:0; }
+.candidate.selected i { opacity:1; }
+.nomination .custom-label { width:min(420px,100%); margin:35px auto 8px; text-align:left; }
+.nomination .custom-input { width:min(420px,100%); text-align:center; }
+@media(max-width:760px) {
+  .ballot-section { padding:64px 0 75px; }
+  .ballot-section > .section-heading,.submit-wrap { margin-left:20px; margin-right:20px; }
+  .nomination { padding:42px 18px 48px; }
+  .nomination h3 { font-size:27px; }
+  .nomination-candidates { gap:22px 12px; margin-top:26px; }
+  .candidate { width:96px; flex-basis:96px; gap:8px; }
+  .candidate .candidate-avatar { flex-basis:88px; width:88px; height:88px; }
+  .candidate-name { max-width:96px; font-size:10px; }
+  .candidate i { right:0; }
+}
