@@ -13,11 +13,12 @@ create table if not exists public.slago_nominees (
   id uuid primary key default gen_random_uuid(),
   nomination_id uuid not null references public.slago_nominations(id) on delete cascade,
   name text not null,
-  discord_id text unique,
+  discord_id text,
   discord_username text,
   avatar_url text,
   sort_order smallint not null default 1,
-  unique (nomination_id, sort_order)
+  unique (nomination_id, sort_order),
+  unique (nomination_id, discord_id)
 );
 create table if not exists public.slago_votes (
   id bigint generated always as identity primary key,
@@ -39,7 +40,7 @@ alter table public.slago_votes add constraint slago_votes_choice_check check (
 alter table public.slago_nominations enable row level security;
 alter table public.slago_nominees enable row level security;
 alter table public.slago_votes enable row level security;
-create policy "Anyone may view active Slago nominations" on public.slago_nominations for select using (is_active = true);
+create policy "Anyone may view Slago nominations" on public.slago_nominations for select using (true);
 create policy "Anyone may view Slago nominees" on public.slago_nominees for select using (true);
 create policy "Users may submit own Slago votes" on public.slago_votes for insert to authenticated with check (auth.uid() = voter_id);
 

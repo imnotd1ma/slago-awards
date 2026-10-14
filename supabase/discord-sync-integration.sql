@@ -2,8 +2,22 @@
 -- Edge Function Secret Gate вызывает эту функцию после синхронизации Discord.
 
 alter table public.slago_nominees
-  add column if not exists discord_id text unique,
+  add column if not exists discord_id text,
   add column if not exists discord_username text;
+
+alter table public.slago_nominees
+  drop constraint if exists slago_nominees_discord_id_key;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.slago_nominees'::regclass
+      and conname = 'slago_nominees_nomination_discord_id_key'
+  ) then
+    alter table public.slago_nominees
+      add constraint slago_nominees_nomination_discord_id_key unique (nomination_id, discord_id);
+  end if;
+end $$;
 
 create or replace function public.sync_slago_nominees(p_members jsonb)
 returns integer
