@@ -200,7 +200,7 @@ async function loadPlayers() {
   reconcileCrossChoices();
   render();
 }
-async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: profile } = await supabaseClient.from('profiles').select('is_admin').eq('id', state.user.id).maybeSingle(); adminLink.hidden = profile?.is_admin !== true; } else if (adminLink) adminLink.hidden = true; updateProgress(); }
+async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: isAdmin, error } = await supabaseClient.rpc('is_slago_admin'); adminLink.hidden = error || isAdmin !== true; } else if (adminLink) adminLink.hidden = true; updateProgress(); }
 async function loadVotingStatus() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.rpc('get_slago_vote_status');

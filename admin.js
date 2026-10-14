@@ -9,6 +9,13 @@ const adminDashboard = $('#adminDashboard');
 let currentData;
 
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]); }
+function discordIdFromUser(user) {
+  const metadataId = user?.user_metadata?.provider_id || user?.user_metadata?.sub;
+  if (metadataId) return String(metadataId);
+  const identity = user?.identities?.find(item => item.provider === 'discord');
+  const identityId = identity?.identity_data?.sub || identity?.identity_data?.provider_id;
+  return identityId ? String(identityId) : '';
+}
 function toLocalInput(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -60,14 +67,12 @@ async function refresh() {
     setMessage('Войди через Discord, чтобы открыть панель администратора.'); return;
   }
   adminAuth.textContent = 'Выйти';
-  const { data: profile, error: profileError } = await client.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
-  if (profileError || profile?.is_admin !== true) {
+  const { data: isAdmin, error: profileError } = await client.rpc('is_slago_admin');
+  if (profileError || isAdmin !== true) {
     adminControls.hidden = true; adminDashboard.hidden = true;
     setMessage(profileError
       ? `Не удалось проверить права: ${profileError.message}`
-      : profile
-        ? `У текущего аккаунта is_admin не равен true. UUID аккаунта: ${session.user.id}`
-        : `В profiles не найдена строка для текущего аккаунта. UUID аккаунта: ${session.user.id}`, true);
+      : `Для Discord ID ${discordIdFromUser(session.user) || '(не найден)'} не найдена запись с is_admin = true в profiles.`, true);
     return;
   }
   const { data, error } = await client.rpc('get_slago_admin_data');
