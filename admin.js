@@ -63,7 +63,12 @@ async function refresh() {
   const { data: profile, error: profileError } = await client.from('profiles').select('is_admin').eq('id', session.user.id).maybeSingle();
   if (profileError || profile?.is_admin !== true) {
     adminControls.hidden = true; adminDashboard.hidden = true;
-    setMessage(profileError ? `Не удалось проверить права: ${profileError.message}` : 'Доступ только для администраторов.', true); return;
+    setMessage(profileError
+      ? `Не удалось проверить права: ${profileError.message}`
+      : profile
+        ? `У текущего аккаунта is_admin не равен true. UUID аккаунта: ${session.user.id}`
+        : `В profiles не найдена строка для текущего аккаунта. UUID аккаунта: ${session.user.id}`, true);
+    return;
   }
   const { data, error } = await client.rpc('get_slago_admin_data');
   if (error) { setMessage(`Не удалось загрузить данные: ${error.message}`, true); return; }
