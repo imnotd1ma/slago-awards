@@ -19,8 +19,9 @@
       <section class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Голосование</h1></div><button id="refreshAdmin" class="refresh-button" type="button" title="Обновить данные" aria-label="Обновить данные">↻</button></section>
       <p id="adminMessage" class="admin-message" role="status">Проверяем права доступа…</p>
       <section id="adminControls" class="admin-controls" hidden>
-        <div class="admin-control-row"><div><h2 id="votingStateLabel">Голосование открыто</h2><p>Приём голосов дополнительно ограничен указанным временем.</p></div><label class="switch"><input id="votingOpen" type="checkbox"><span></span></label></div>
-        <div class="admin-dates"><label>Начало<input id="votingStarts" type="datetime-local"></label><label>Окончание<input id="votingEnds" type="datetime-local"></label></div>
+        <div class="admin-control-row"><div><h2 id="votingStateLabel">Голосование открыто</h2><p>Включи переключатель: голосование стартует по расписанию и закроется по времени окончания.</p></div><label class="switch"><input id="votingOpen" type="checkbox"><span></span></label></div>
+        <p id="votingPeriod" class="voting-period">Период голосования не задан</p>
+        <div class="admin-dates"><label>Начало, МСК (UTC+3)<input id="votingStarts" type="datetime-local"></label><label>Окончание, МСК (UTC+3)<input id="votingEnds" type="datetime-local"></label></div>
         <label class="final-toggle"><input id="resultsFinal" type="checkbox"><span>Результаты окончательные</span></label>
         <div class="admin-actions"><button id="saveSettings" class="submit-button" type="button">Сохранить настройки</button><span id="saveMessage" role="status"></span></div>
       </section>

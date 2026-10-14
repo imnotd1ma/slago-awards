@@ -208,6 +208,11 @@ async function loadVotingStatus() {
   state.votingAccepting = data.accepting_votes === true;
   votingStatus?.classList.toggle('is-closed', !state.votingAccepting);
   if (votingStatus) votingStatus.innerHTML = `<i></i> ${state.votingAccepting ? 'голосование открыто' : 'голосование закрыто'}`;
+  const formatMoscow = value => value ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) : 'не задано';
+  const schedule = document.querySelector('#votingSchedule');
+  if (schedule) schedule.textContent = !data.starts_at && !data.ends_at
+    ? 'Период голосования не задан'
+    : `Период: ${formatMoscow(data.starts_at)} — ${formatMoscow(data.ends_at)} МСК`;
   updateProgress();
 }
 authButton.addEventListener('click', async () => {

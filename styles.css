@@ -125,6 +125,8 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .admin-control-row { display:flex; align-items:center; justify-content:space-between; gap:20px; }
 .admin-control-row h2,.admin-section h2 { margin:0; font:600 18px Unbounded,sans-serif; }
 .admin-control-row p { margin:7px 0 0; color:var(--muted); font-size:12px; }
+.voting-period { margin:20px 0 0; color:#fff1cf; font-size:13px; font-weight:700; }
+.voting-schedule { margin:-10px 0 23px; color:#fff1cf; font-size:12px; font-weight:700; }
 .switch { position:relative; width:54px; height:30px; flex:none; }
 .switch input { position:absolute; opacity:0; width:1px; height:1px; }
 .switch span { position:absolute; inset:0; border:1px solid var(--line); background:#29334f; cursor:pointer; transition:background .2s; }

@@ -16,18 +16,39 @@ function discordIdFromUser(user) {
   const identityId = identity?.identity_data?.sub || identity?.identity_data?.provider_id;
   return identityId ? String(identityId) : '';
 }
-function toLocalInput(value) {
+function moscowParts(value) {
+  return Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date(value)).map(part => [part.type, part.value]));
+}
+function toMoscowInput(value) {
   if (!value) return '';
-  const date = new Date(value);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  const parts = moscowParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+function moscowInputToISO(value) {
+  return value ? new Date(`${value}:00+03:00`).toISOString() : null;
+}
+function formatMoscow(value) {
+  if (!value) return 'не задано';
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(new Date(value));
+}
+function updateVotingPeriod(settings) {
+  $('#votingPeriod').textContent = !settings.starts_at && !settings.ends_at
+    ? 'Период голосования не задан'
+    : `Период: ${formatMoscow(settings.starts_at)} — ${formatMoscow(settings.ends_at)} МСК`;
 }
 function setMessage(message, error = false) { adminMessage.textContent = message; adminMessage.classList.toggle('is-error', error); }
 function setSettings(settings) {
   $('#votingOpen').checked = settings.is_open;
   $('#votingStateLabel').textContent = settings.accepting_votes ? 'Голосование открыто' : settings.is_open ? 'Ожидает расписания' : 'Голосование закрыто';
-  $('#votingStarts').value = toLocalInput(settings.starts_at);
-  $('#votingEnds').value = toLocalInput(settings.ends_at);
+  $('#votingStarts').value = toMoscowInput(settings.starts_at);
+  $('#votingEnds').value = toMoscowInput(settings.ends_at);
+  updateVotingPeriod(settings);
   $('#resultsFinal').checked = settings.results_final;
   $('#resultsState').textContent = settings.results_final ? 'Окончательные' : 'Предварительные';
 }
@@ -96,8 +117,8 @@ $('#votingOpen').addEventListener('change', () => {
 $('#saveSettings').addEventListener('click', async () => {
   const startsValue = $('#votingStarts').value;
   const endsValue = $('#votingEnds').value;
-  const starts = startsValue ? new Date(startsValue) : null;
-  const ends = endsValue ? new Date(endsValue) : null;
+  const starts = startsValue ? new Date(moscowInputToISO(startsValue)) : null;
+  const ends = endsValue ? new Date(moscowInputToISO(endsValue)) : null;
   if (starts && ends && ends <= starts) { $('#saveMessage').textContent = 'Окончание должно быть позже начала.'; return; }
   const { data, error } = await client.rpc('update_slago_vote_settings', {
     requested_open: $('#votingOpen').checked,
