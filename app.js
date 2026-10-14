@@ -206,13 +206,15 @@ async function loadVotingStatus() {
   const { data, error } = await supabaseClient.rpc('get_slago_vote_status');
   if (error || !data) { console.warn('Не удалось получить статус голосования:', error); return; }
   state.votingAccepting = data.accepting_votes === true;
+  const waitingForStart = data.is_open && data.starts_at && Date.now() < new Date(data.starts_at).getTime();
+  const statusText = state.votingAccepting ? 'Голосование открыто' : waitingForStart ? 'Стартует по расписанию' : 'Голосование закрыто';
   votingStatus?.classList.toggle('is-closed', !state.votingAccepting);
-  if (votingStatus) votingStatus.innerHTML = `<i></i> ${state.votingAccepting ? 'голосование открыто' : 'голосование закрыто'}`;
+  votingStatus?.classList.toggle('is-waiting', !state.votingAccepting && Boolean(waitingForStart));
+  if (votingStatus) votingStatus.innerHTML = `<i></i> ${statusText}`;
   const formatMoscow = value => value ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) : 'не задано';
-  const schedule = document.querySelector('#votingSchedule');
-  if (schedule) schedule.textContent = !data.starts_at && !data.ends_at
-    ? 'Период голосования не задан'
-    : `Период: ${formatMoscow(data.starts_at)} — ${formatMoscow(data.ends_at)} МСК`;
+  document.querySelector('#votingWindowStatus').textContent = statusText;
+  document.querySelector('#votingStartsDisplay').textContent = formatMoscow(data.starts_at);
+  document.querySelector('#votingEndsDisplay').textContent = formatMoscow(data.ends_at);
   updateProgress();
 }
 authButton.addEventListener('click', async () => {

@@ -59,7 +59,10 @@
           <div><p class="eyebrow">БЮЛЛЕТЕНЬ</p><h2>Номинации</h2></div>
           <div class="progress"><span id="progressText">0 из 12 выбрано</span><div><i id="progressBar"></i></div></div>
         </div>
-        <p id="votingSchedule" class="voting-schedule">Период голосования загружается…</p>
+        <div id="votingSchedule" class="voting-schedule" aria-live="polite">
+          <div class="voting-window-meta"><strong id="votingWindowStatus">Проверяем статус</strong><span>Московское время · UTC+3</span></div>
+          <div class="voting-window-times"><div><small>Начало голосования</small><strong id="votingStartsDisplay">Загружается…</strong></div><span class="voting-window-divider" aria-hidden="true">→</span><div><small>Окончание голосования</small><strong id="votingEndsDisplay">Загружается…</strong></div></div>
+        </div>
         <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
         <div class="submit-wrap reveal">
           <p id="submitHint">Выбери кандидата в каждой номинации.</p>
