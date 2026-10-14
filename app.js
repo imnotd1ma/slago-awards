@@ -21,9 +21,11 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, setupMessage: '' };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, setupMessage: '' };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
+const adminLink = document.querySelector('#adminLink');
+const votingStatus = document.querySelector('#votingStatus');
 const submitButton = document.querySelector('#submitVote');
 const progressText = document.querySelector('#progressText');
 const progressBar = document.querySelector('#progressBar');
@@ -42,8 +44,8 @@ function updateProgress() {
   const count = state.choices.size;
   progressText.textContent = `${count} из ${state.nominations.length} выбрано`;
   progressBar.style.width = `${count / state.nominations.length * 100}%`;
-  submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations;
-  submitHint.textContent = state.setupMessage || (!state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
+  submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations || !state.votingAccepting;
+  submitHint.textContent = state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
 }
 function updateChoiceUI(nominationId) {
   const nomination = state.nominations.find(item => item.id === nominationId);
@@ -198,7 +200,16 @@ async function loadPlayers() {
   reconcileCrossChoices();
   render();
 }
-async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; updateProgress(); }
+async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: profile } = await supabaseClient.from('profiles').select('is_admin').eq('id', state.user.id).maybeSingle(); adminLink.hidden = profile?.is_admin !== true; } else if (adminLink) adminLink.hidden = true; updateProgress(); }
+async function loadVotingStatus() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.rpc('get_slago_vote_status');
+  if (error || !data) { console.warn('Не удалось получить статус голосования:', error); return; }
+  state.votingAccepting = data.accepting_votes === true;
+  votingStatus?.classList.toggle('is-closed', !state.votingAccepting);
+  if (votingStatus) votingStatus.innerHTML = `<i></i> ${state.votingAccepting ? 'голосование открыто' : 'голосование закрыто'}`;
+  updateProgress();
+}
 authButton.addEventListener('click', async () => {
   if (!supabaseClient) return toast(isConfigured ? 'Supabase не загрузился. Запусти сайт через Live Server и обнови страницу.' : 'Добавь ключи Supabase в app.js.');
   if (state.user) { await supabaseClient.auth.signOut(); toast('Вы вышли из аккаунта.'); return; }
@@ -211,10 +222,10 @@ submitButton.addEventListener('click', async () => {
   submitButton.disabled = true;
   const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'cross' ? choice.name : null, custom_nominee_discord_id: choice.type === 'cross' ? choice.discordId || null : null }));
   const { error } = await supabaseClient.from('slago_votes').insert(rows);
-  if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : `Не удалось отправить: ${error.message}`); updateProgress(); return; }
+  if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : error.message.includes('VOTING_CLOSED') ? 'Голосование закрыто.' : `Не удалось отправить: ${error.message}`); await loadVotingStatus(); updateProgress(); return; }
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });
 render();
-if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
+if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); loadVotingStatus(); setInterval(loadVotingStatus, 30000); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
 window.addEventListener('load', () => document.body.classList.add('is-ready'));

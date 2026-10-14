@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08163c" />
+    <title>SLAGO Awards — Администрирование</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-page">
+    <header class="topbar">
+      <a class="brand" href="index.html"><span class="brand-mark">S</span><span>SLAGO <i>AWARDS</i></span></a>
+      <div class="topbar-actions"><a class="admin-link" href="index.html">На сайт</a><button id="adminAuth" class="discord-button">Войти через Discord</button></div>
+    </header>
+    <main class="admin-main">
+      <section class="admin-heading"><div><p class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</p><h1>Голосование</h1></div><button id="refreshAdmin" class="refresh-button" type="button" title="Обновить данные" aria-label="Обновить данные">↻</button></section>
+      <p id="adminMessage" class="admin-message" role="status">Проверяем права доступа…</p>
+      <section id="adminControls" class="admin-controls" hidden>
+        <div class="admin-control-row"><div><h2 id="votingStateLabel">Голосование открыто</h2><p>Приём голосов дополнительно ограничен указанным временем.</p></div><label class="switch"><input id="votingOpen" type="checkbox"><span></span></label></div>
+        <div class="admin-dates"><label>Начало<input id="votingStarts" type="datetime-local"></label><label>Окончание<input id="votingEnds" type="datetime-local"></label></div>
+        <label class="final-toggle"><input id="resultsFinal" type="checkbox"><span>Результаты окончательные</span></label>
+        <div class="admin-actions"><button id="saveSettings" class="submit-button" type="button">Сохранить настройки</button><span id="saveMessage" role="status"></span></div>
+      </section>
+      <section id="adminDashboard" hidden>
+        <div class="admin-stats"><div><span>Голосов</span><strong id="voteCount">0</strong></div><div><span>Участников</span><strong id="voterCount">0</strong></div><div><span>Статус результатов</span><strong id="resultsState">Предварительные</strong></div></div>
+        <section class="admin-section"><div class="admin-section-heading"><div><p class="eyebrow">СВОДКА</p><h2>Итоги по номинациям</h2></div></div><div id="resultsTable" class="admin-results"></div></section>
+        <section class="admin-section"><div class="admin-section-heading"><div><p class="eyebrow">ПОДРОБНО</p><h2>История голосов</h2></div><label class="history-filter">Номинация<select id="historyFilter"><option value="">Все номинации</option></select></label></div><div class="admin-table-wrap"><table class="admin-history"><thead><tr><th>Время</th><th>Участник</th><th>Номинация</th><th>Голос</th></tr></thead><tbody id="historyRows"></tbody></table></div></section>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>
