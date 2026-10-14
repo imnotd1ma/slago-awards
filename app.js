@@ -60,12 +60,50 @@ function updateChoiceUI(nominationId) {
   });
   updateProgress();
 }
+function showOtherNomineeSuggestions(input) {
+  const nominationId = input.dataset.customNomination;
+  const list = input.parentElement.querySelector('.person-suggestions');
+  const query = input.value.trim().toLocaleLowerCase('ru');
+  if (!query) { list.hidden = true; list.replaceChildren(); return; }
+
+  const seen = new Set();
+  const matches = state.nominations
+    .filter(item => item.id !== nominationId)
+    .flatMap(item => item.nominees.map(person => ({ ...person, sourceTitle: item.title })))
+    .filter(person => {
+      const matches = person.name.toLocaleLowerCase('ru').includes(query)
+        || person.discordUsername?.toLocaleLowerCase('ru').includes(query);
+      if (!matches) return false;
+      const key = person.discordId || person.name.trim().toLocaleLowerCase('ru');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 8);
+
+  if (!matches.length) {
+    list.innerHTML = '<span class="person-suggestions-empty">В других номинациях не найдено</span>';
+  } else {
+    list.innerHTML = matches.map(person => `<button class="person-suggestion" type="button" data-person-choice="${escapeHTML(person.id)}"><span>${escapeHTML(person.name)}</span><small>${escapeHTML(person.sourceTitle)}</small></button>`).join('');
+    list.querySelectorAll('[data-person-choice]').forEach(button => button.addEventListener('click', () => {
+      const selected = matches.find(person => person.id === button.dataset.personChoice);
+      if (!selected) return;
+      state.choices.set(nominationId, { type: 'cross', id: selected.id, name: selected.name, discordId: selected.discordId });
+      input.value = selected.name;
+      list.hidden = true;
+      list.replaceChildren();
+      updateChoiceUI(nominationId);
+    }));
+  }
+  list.hidden = false;
+}
 function render() {
   const nominationCard = nomination => {
     const choice = state.choices.get(nomination.id);
-    const candidates = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-nomination="${escapeHTML(nomination.id)}" data-person="${escapeHTML(person.id)}" aria-pressed="${choice?.type === 'existing' && choice.id === person.id}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i></button>`).join('');
-    const customName = choice?.type === 'custom' ? choice.name : '';
-    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или предложи своего</label><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Имя номинанта" value="${escapeHTML(customName)}" /></article>`;
+    const isZavoz = nomination.slug?.startsWith('zavoz-year');
+    const candidates = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-nomination="${escapeHTML(nomination.id)}" data-person="${escapeHTML(person.id)}" aria-pressed="${choice?.type === 'existing' && choice.id === person.id}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i>${isZavoz && person.description ? `<span class="candidate-description">${escapeHTML(person.description)}</span>` : ''}</button>`).join('');
+    const customName = choice?.type === 'cross' ? choice.name : '';
+    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери кандидата из другой номинации</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
   grid.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
@@ -74,14 +112,13 @@ function render() {
     if (!nomination || !person) return;
     state.choices.set(nomination.id, { type: 'existing', id: person.id, name: person.name });
     const customInput = grid.querySelector(`[data-custom-nomination="${CSS.escape(nomination.id)}"]`);
-    if (customInput) customInput.value = '';
+    if (customInput) { customInput.value = ''; customInput.parentElement.querySelector('.person-suggestions').hidden = true; }
     updateChoiceUI(nomination.id);
   }));
   grid.querySelectorAll('[data-custom-nomination]').forEach(input => input.addEventListener('input', () => {
     const nominationId = input.dataset.customNomination;
-    const customName = input.value.trim().replace(/\s+/g, ' ');
-    if (customName) state.choices.set(nominationId, { type: 'custom', name: customName });
-    else if (state.choices.get(nominationId)?.type === 'custom') state.choices.delete(nominationId);
+    state.choices.delete(nominationId);
+    showOtherNomineeSuggestions(input);
     updateChoiceUI(nominationId);
   }));
   updateProgress();
@@ -105,20 +142,21 @@ function subscribeToNominationChanges() {
 }
 async function loadNominations() {
   if (!supabaseClient) return render();
-  const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, discord_username, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
+  const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
   if (error || !data?.length) {
     state.setupMessage = error ? `Бюллетень временный: Supabase не вернул номинации (${error.message}).` : 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
     return render();
   }
-  const nextNominations = data.map((item, index) => ({ id: item.id, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, avatarUrl: person.avatar_url || '' })) }));
+  const nextNominations = data.map((item, index) => ({ id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, description: person.description || '', discordId: person.discord_id, discordUsername: person.discord_username, avatarUrl: person.avatar_url || '' })) }));
   const activeNominationIds = new Set(nextNominations.map(item => item.id));
-  const nextNominees = new Map(nextNominations.flatMap(item => item.nominees.map(person => [person.id, person])));
+  const nextNominees = new Map(nextNominations.flatMap(item => item.nominees.map(person => [person.id, { ...person, nominationId: item.id }])));
   for (const [nominationId, choice] of state.choices) {
     if (!activeNominationIds.has(nominationId)) { state.choices.delete(nominationId); continue; }
-    if (choice.type === 'custom') continue;
-    const updatedNominee = nextNominees.get(choice.id);
+    const updatedNominee = choice.type === 'cross'
+      ? [...nextNominees.values()].find(person => person.nominationId !== nominationId && (choice.discordId ? person.discordId === choice.discordId : person.name.toLocaleLowerCase('ru') === choice.name.toLocaleLowerCase('ru')))
+      : nextNominees.get(choice.id);
     if (!updatedNominee) state.choices.delete(nominationId);
-    else choice.name = updatedNominee.name;
+    else { choice.name = updatedNominee.name; if (choice.type === 'cross') choice.discordId = updatedNominee.discordId; }
   }
   state.nominations = nextNominations;
   state.remoteNominations = true; render();
@@ -134,7 +172,7 @@ authButton.addEventListener('click', async () => {
 submitButton.addEventListener('click', async () => {
   if (!state.user || !supabaseClient) return;
   submitButton.disabled = true;
-  const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'custom' ? choice.name : null }));
+  const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'cross' ? choice.name : null, custom_nominee_discord_id: choice.type === 'cross' ? choice.discordId || null : null }));
   const { error } = await supabaseClient.from('slago_votes').insert(rows);
   if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : `Не удалось отправить: ${error.message}`); updateProgress(); return; }
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);

@@ -5,10 +5,28 @@ alter table public.slago_nominees
   add column if not exists discord_id text,
   add column if not exists discord_username text;
 
-alter table public.slago_nominees
-  drop constraint if exists slago_nominees_discord_id_key;
+do $$
+declare
+  unique_constraint record;
+  discord_id_attnum smallint;
+begin
+  select attnum into discord_id_attnum
+  from pg_attribute
+  where attrelid = 'public.slago_nominees'::regclass
+    and attname = 'discord_id'
+    and not attisdropped;
 
-do $$ begin
+  -- Remove an older UNIQUE(discord_id) constraint, regardless of its name.
+  for unique_constraint in
+    select conname
+    from pg_constraint
+    where conrelid = 'public.slago_nominees'::regclass
+      and contype = 'u'
+      and conkey = array[discord_id_attnum]::smallint[]
+  loop
+    execute format('alter table public.slago_nominees drop constraint %I', unique_constraint.conname);
+  end loop;
+
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.slago_nominees'::regclass

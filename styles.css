@@ -97,7 +97,15 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .candidate i { position:absolute; top:5px; right:9px; z-index:2; width:25px; height:25px; display:grid; place-items:center; border-radius:50%; background:var(--accent); color:#101522; font-size:13px; font-style:normal; opacity:0; }
 .candidate.selected i { opacity:1; }
 .nomination .custom-label { width:min(420px,100%); margin:35px auto 8px; text-align:left; }
-.nomination .custom-input { width:min(420px,100%); text-align:center; }
+.custom-picker { position:relative; width:min(420px,100%); margin:auto; }
+.nomination .custom-input { width:100%; text-align:left; }
+.person-suggestions { position:absolute; z-index:5; top:calc(100% + 5px); left:0; right:0; max-height:260px; overflow:auto; border:1px solid rgba(191,219,254,.24); background:#111a31; box-shadow:0 16px 34px rgba(0,0,0,.38); text-align:left; }
+.person-suggestions[hidden] { display:none; }
+.person-suggestion { width:100%; padding:11px 13px; display:flex; justify-content:space-between; align-items:center; gap:12px; border:0; border-bottom:1px solid rgba(191,219,254,.1); color:#f4f1e9; background:transparent; text-align:left; }
+.person-suggestion:hover,.person-suggestion:focus-visible { background:rgba(248,219,149,.12); outline:0; }
+.person-suggestion small,.person-suggestions-empty { color:rgba(203,218,251,.62); font-size:10px; }
+.person-suggestions-empty { display:block; padding:12px; }
+.candidate-description { color:rgba(238,239,245,.66); font-size:11px; font-weight:400; line-height:1.45; overflow-wrap:anywhere; }
 @media(max-width:760px) {
   .ballot-section { padding:64px 0 75px; }
   .ballot-section > .section-heading,.submit-wrap { margin-left:20px; margin-right:20px; }
