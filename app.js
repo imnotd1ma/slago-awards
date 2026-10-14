@@ -21,7 +21,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, choices: new Map(), user: null, remoteNominations: false, setupMessage: '' };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, setupMessage: '' };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const submitButton = document.querySelector('#submitVote');
@@ -60,36 +60,58 @@ function updateChoiceUI(nominationId) {
   });
   updateProgress();
 }
+function playerAlreadyNominated(player, nomination) {
+  const username = player.username?.trim().toLocaleLowerCase('ru');
+  const discordUsername = player.discordUsername?.trim().toLocaleLowerCase('ru');
+  return nomination.nominees.some(nominee => player.discordId
+    ? nominee.discordId === player.discordId
+    : [nominee.name, nominee.discordUsername].some(name => {
+      const normalized = name?.trim().toLocaleLowerCase('ru');
+      return normalized && (normalized === username || normalized === discordUsername);
+    }));
+}
+function reconcileCrossChoices() {
+  for (const [nominationId, choice] of state.choices) {
+    if (choice.type !== 'cross') continue;
+    const nomination = state.nominations.find(item => item.id === nominationId);
+    const player = state.players.find(item => choice.discordId
+      ? item.discordId === choice.discordId
+      : item.id === (choice.playerId || choice.id));
+    if (!nomination || !player || playerAlreadyNominated(player, nomination)) {
+      state.choices.delete(nominationId);
+      continue;
+    }
+    choice.name = player.username;
+    choice.discordId = player.discordId;
+    choice.playerId = player.id;
+    choice.id = player.id;
+  }
+}
 function showOtherNomineeSuggestions(input) {
   const nominationId = input.dataset.customNomination;
   const list = input.parentElement.querySelector('.person-suggestions');
   const query = input.value.trim().toLocaleLowerCase('ru');
   if (!query) { list.hidden = true; list.replaceChildren(); return; }
 
-  const seen = new Set();
-  const matches = state.nominations
-    .filter(item => item.id !== nominationId)
-    .flatMap(item => item.nominees.map(person => ({ ...person, sourceTitle: item.title })))
-    .filter(person => {
-      const matches = person.name.toLocaleLowerCase('ru').includes(query)
-        || person.discordUsername?.toLocaleLowerCase('ru').includes(query);
-      if (!matches) return false;
-      const key = person.discordId || person.name.trim().toLocaleLowerCase('ru');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
+  const nomination = state.nominations.find(item => item.id === nominationId);
+  const matches = state.players
+    .filter(player => nomination && !playerAlreadyNominated(player, nomination))
+    .filter(player => player.username?.toLocaleLowerCase('ru').includes(query)
+      || player.discordUsername?.toLocaleLowerCase('ru').includes(query))
     .slice(0, 8);
 
   if (!matches.length) {
-    list.innerHTML = '<span class="person-suggestions-empty">В других номинациях не найдено</span>';
+    list.innerHTML = '<span class="person-suggestions-empty">Другие пользователи не найдены</span>';
   } else {
-    list.innerHTML = matches.map(person => `<button class="person-suggestion" type="button" data-person-choice="${escapeHTML(person.id)}"><span>${escapeHTML(person.name)}</span><small>${escapeHTML(person.sourceTitle)}</small></button>`).join('');
+    list.innerHTML = matches.map(person => {
+      const avatar = typeof person.avatarUrl === 'string' && /^https?:\/\//i.test(person.avatarUrl) ? `<img src="${escapeHTML(person.avatarUrl)}" alt="" loading="lazy">` : '';
+      return `<button class="person-suggestion" type="button" data-person-choice="${escapeHTML(person.id)}"><span class="person-suggestion-player">${avatar}<span>${escapeHTML(person.username)}</span></span><small>${escapeHTML(person.discordUsername || 'Discord')}</small></button>`;
+    }).join('');
     list.querySelectorAll('[data-person-choice]').forEach(button => button.addEventListener('click', () => {
       const selected = matches.find(person => person.id === button.dataset.personChoice);
       if (!selected) return;
-      state.choices.set(nominationId, { type: 'cross', id: selected.id, name: selected.name, discordId: selected.discordId });
-      input.value = selected.name;
+      state.choices.set(nominationId, { type: 'cross', id: selected.id, playerId: selected.id, name: selected.username, discordId: selected.discordId });
+      input.value = selected.username;
       list.hidden = true;
       list.replaceChildren();
       updateChoiceUI(nominationId);
@@ -103,7 +125,7 @@ function render() {
     const isZavoz = nomination.slug?.startsWith('zavoz-year');
     const candidates = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-nomination="${escapeHTML(nomination.id)}" data-person="${escapeHTML(person.id)}" aria-pressed="${choice?.type === 'existing' && choice.id === person.id}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i>${isZavoz && person.description ? `<span class="candidate-description">${escapeHTML(person.description)}</span>` : ''}</button>`).join('');
     const customName = choice?.type === 'cross' ? choice.name : '';
-    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери кандидата из другой номинации</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
+    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
   grid.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
@@ -135,6 +157,7 @@ function subscribeToNominationChanges() {
   supabaseClient.channel('slago-nominations-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'slago_nominations' }, scheduleNominationsRefresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'slago_nominees' }, scheduleNominationsRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, schedulePlayersRefresh)
     .subscribe(status => {
       if (status === 'SUBSCRIBED' && nominationChannelConnected) scheduleNominationsRefresh();
       if (status === 'SUBSCRIBED') nominationChannelConnected = true;
@@ -148,18 +171,32 @@ async function loadNominations() {
     return render();
   }
   const nextNominations = data.map((item, index) => ({ id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, description: person.description || '', discordId: person.discord_id, discordUsername: person.discord_username, avatarUrl: person.avatar_url || '' })) }));
-  const activeNominationIds = new Set(nextNominations.map(item => item.id));
-  const nextNominees = new Map(nextNominations.flatMap(item => item.nominees.map(person => [person.id, { ...person, nominationId: item.id }])));
-  for (const [nominationId, choice] of state.choices) {
-    if (!activeNominationIds.has(nominationId)) { state.choices.delete(nominationId); continue; }
-    const updatedNominee = choice.type === 'cross'
-      ? [...nextNominees.values()].find(person => person.nominationId !== nominationId && (choice.discordId ? person.discordId === choice.discordId : person.name.toLocaleLowerCase('ru') === choice.name.toLocaleLowerCase('ru')))
-      : nextNominees.get(choice.id);
-    if (!updatedNominee) state.choices.delete(nominationId);
-    else { choice.name = updatedNominee.name; if (choice.type === 'cross') choice.discordId = updatedNominee.discordId; }
-  }
   state.nominations = nextNominations;
+  const activeNominationIds = new Set(nextNominations.map(item => item.id));
+  for (const [nominationId, choice] of state.choices) {
+    if (!activeNominationIds.has(nominationId)) state.choices.delete(nominationId);
+    else if (choice.type === 'existing' && !nextNominations.find(item => item.id === nominationId)?.nominees.some(person => person.id === choice.id)) state.choices.delete(nominationId);
+  }
+  reconcileCrossChoices();
   state.remoteNominations = true; render();
+}
+let playersRefreshTimer;
+function schedulePlayersRefresh() {
+  clearTimeout(playersRefreshTimer);
+  playersRefreshTimer = setTimeout(() => loadPlayers().catch(error => console.warn('Не удалось обновить игроков:', error)), 120);
+}
+async function loadPlayers() {
+  if (!supabaseClient) return;
+  const players = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabaseClient.from('profiles').select('id, discord_id, username, discord_username, avatar_url').order('username').range(from, from + 999);
+    if (error) { console.warn('Не удалось загрузить игроков:', error); return; }
+    players.push(...(data || []).map(player => ({ id: player.id, discordId: player.discord_id, username: player.username, discordUsername: player.discord_username, avatarUrl: player.avatar_url })));
+    if (!data || data.length < 1000) break;
+  }
+  state.players = players;
+  reconcileCrossChoices();
+  render();
 }
 async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; updateProgress(); }
 authButton.addEventListener('click', async () => {
@@ -178,6 +215,6 @@ submitButton.addEventListener('click', async () => {
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });
 render();
-if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
+if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
 window.addEventListener('load', () => document.body.classList.add('is-ready'));

@@ -1,5 +1,5 @@
--- Add zavoz descriptions and restrict custom ballot choices to candidates
--- already listed in a different nomination.
+-- Add zavoz descriptions and restrict custom ballot choices to known users
+-- who are not already nominated in the selected nomination.
 
 alter table public.slago_nominees
   add column if not exists description text;
@@ -32,19 +32,27 @@ begin
     end if;
   elsif new.custom_nominee_discord_id is not null then
     if not exists (
-      select 1 from public.slago_nominees
-      where discord_id = new.custom_nominee_discord_id
-        and nomination_id <> new.nomination_id
-        and lower(trim(name)) = lower(trim(new.custom_nominee))
+      select 1 from public.profiles p
+      where p.discord_id = new.custom_nominee_discord_id
+        and lower(trim(p.username)) = lower(trim(new.custom_nominee))
+        and not exists (
+          select 1 from public.slago_nominees n
+          where n.nomination_id = new.nomination_id
+            and (n.discord_id = p.discord_id or (n.discord_id is null and lower(trim(n.name)) in (lower(trim(p.username)), lower(trim(p.discord_username)))))
+        )
     ) then
-      raise exception 'NOMINEE_MUST_BE_FROM_ANOTHER_CATEGORY';
+      raise exception 'USER_NOT_AVAILABLE_FOR_NOMINATION';
     end if;
   elsif not exists (
-    select 1 from public.slago_nominees
-    where nomination_id <> new.nomination_id
-      and lower(trim(name)) = lower(trim(new.custom_nominee))
+    select 1 from public.profiles p
+    where lower(trim(p.username)) = lower(trim(new.custom_nominee))
+      and not exists (
+        select 1 from public.slago_nominees n
+        where n.nomination_id = new.nomination_id
+          and lower(trim(n.name)) in (lower(trim(p.username)), lower(trim(p.discord_username)))
+      )
   ) then
-    raise exception 'NOMINEE_MUST_BE_FROM_ANOTHER_CATEGORY';
+    raise exception 'USER_NOT_AVAILABLE_FOR_NOMINATION';
   end if;
 
   return new;

@@ -100,8 +100,13 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .custom-picker { position:relative; width:min(420px,100%); margin:auto; }
 .nomination .custom-input { width:100%; text-align:left; }
 .person-suggestions { position:absolute; z-index:5; top:calc(100% + 5px); left:0; right:0; max-height:260px; overflow:auto; border:1px solid rgba(191,219,254,.24); background:#111a31; box-shadow:0 16px 34px rgba(0,0,0,.38); text-align:left; }
+.nomination:focus-within { z-index:20; }
+.person-suggestions { z-index:21; isolation:isolate; pointer-events:auto; }
 .person-suggestions[hidden] { display:none; }
 .person-suggestion { width:100%; padding:11px 13px; display:flex; justify-content:space-between; align-items:center; gap:12px; border:0; border-bottom:1px solid rgba(191,219,254,.1); color:#f4f1e9; background:transparent; text-align:left; }
+.person-suggestion-player { min-width:0; display:flex; align-items:center; gap:9px; }
+.person-suggestion-player > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.person-suggestion-player img { flex:none; width:28px; height:28px; border-radius:50%; object-fit:cover; }
 .person-suggestion:hover,.person-suggestion:focus-visible { background:rgba(248,219,149,.12); outline:0; }
 .person-suggestion small,.person-suggestions-empty { color:rgba(203,218,251,.62); font-size:10px; }
 .person-suggestions-empty { display:block; padding:12px; }
