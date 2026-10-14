@@ -13,8 +13,8 @@ const FALLBACK_NOMINATIONS = [
   ['sex-symbol-year', 'Секс символ года', ['Меха', 'Матвей tea_bag', 'Семён Мазалов', 'Ярослав Ханчиков', 'Павлик']]
 ].map(([id, title, names], index) => ({ id, title, index: index + 1, isFeatured: index < 3, nominees: names.map((name, nomineeIndex) => ({ id: `${id}-${nomineeIndex + 1}`, name, avatarUrl: '' })) }));
 
-const SUPABASE_URL = 'https://cixxcrjvlgthtfhsujib.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_Z71xb3gpC5_ZnuXs7PlPCg_oTpjguU5';
+const SUPABASE_URL = 'https://yerptwwacgjftjpsfmdi.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_FqrZcdtx_rizOPJBFULWXg_cj7oS9X7';
 const isConfigured = !SUPABASE_URL.startsWith('PASTE_') && !SUPABASE_ANON_KEY.startsWith('PASTE_');
 let supabaseClient = null;
 if (isConfigured && window.supabase?.createClient) {
@@ -71,12 +71,12 @@ function render() {
 }
 async function loadNominations() {
   if (!supabaseClient) return render();
-  const { data, error } = await supabaseClient.from('nominations').select('id, slug, title, sort_order, is_featured, nominees(id, name, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'nominees' });
+  const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, discord_username, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
   if (error || !data?.length) {
     state.setupMessage = error ? `Бюллетень временный: Supabase не вернул номинации (${error.message}).` : 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
     return render();
   }
-  state.nominations = data.map((item, index) => ({ id: item.id, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.nominees || []).map(person => ({ id: person.id, name: person.name, avatarUrl: person.avatar_url || '' })) }));
+  state.nominations = data.map((item, index) => ({ id: item.id, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, avatarUrl: person.avatar_url || '' })) }));
   state.remoteNominations = true; render();
 }
 async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; render(); }
@@ -91,7 +91,7 @@ submitButton.addEventListener('click', async () => {
   if (!state.user || !supabaseClient) return;
   submitButton.disabled = true;
   const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'custom' ? choice.name : null }));
-  const { error } = await supabaseClient.from('votes').insert(rows);
+  const { error } = await supabaseClient.from('slago_votes').insert(rows);
   if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : `Не удалось отправить: ${error.message}`); render(); return; }
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });

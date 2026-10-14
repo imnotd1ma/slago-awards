@@ -5,7 +5,7 @@
 begin;
 
 -- Временно освобождаем уникальные sort_order, чтобы безопасно переставить категории.
-update public.nominations
+update public.slago_nominations
 set sort_order = -(sort_order + 1000);
 
 with source(slug, title, sort_order, is_featured) as (
@@ -23,7 +23,7 @@ with source(slug, title, sort_order, is_featured) as (
     ('kind-year', 'Добряк года', 11, false),
     ('sex-symbol-year', 'Секс символ года', 12, false)
 )
-insert into public.nominations (slug, title, sort_order, is_featured, is_active)
+insert into public.slago_nominations (slug, title, sort_order, is_featured, is_active)
 select slug, title, sort_order, is_featured, true
 from source
 on conflict (slug) do update
@@ -33,13 +33,13 @@ set title = excluded.title,
     is_active = true;
 
 -- Старую дополнительную карточку оставляем в конце списка.
-update public.nominations
+update public.slago_nominations
 set sort_order = 13
 where slug = 'zavoz-year-2';
 
 -- Удаляем только стартовые заглушки, созданные schema.sql.
-delete from public.nominees nominee
-using public.nominations nomination
+delete from public.slago_nominees nominee
+using public.slago_nominations nomination
 where nominee.nomination_id = nomination.id
   and nominee.name = '???'
   and nomination.slug in (
@@ -110,10 +110,10 @@ with source(slug, name, sort_order) as (
     ('sex-symbol-year', 'Ярослав Ханчиков', 4),
     ('sex-symbol-year', 'Павлик', 5)
 )
-insert into public.nominees (nomination_id, name, sort_order)
+insert into public.slago_nominees (nomination_id, name, sort_order)
 select nomination.id, source.name, source.sort_order
 from source
-join public.nominations nomination on nomination.slug = source.slug
+join public.slago_nominations nomination on nomination.slug = source.slug
 on conflict (nomination_id, sort_order) do update
 set name = excluded.name;
 
@@ -121,8 +121,8 @@ commit;
 
 -- Быстрая проверка после импорта:
 select nomination.title, count(nominee.id) as candidates
-from public.nominations nomination
-left join public.nominees nominee on nominee.nomination_id = nomination.id
+from public.slago_nominations nomination
+left join public.slago_nominees nominee on nominee.nomination_id = nomination.id
 where nomination.slug <> 'zavoz-year-2'
 group by nomination.sort_order, nomination.title
 order by nomination.sort_order;

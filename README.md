@@ -1,26 +1,36 @@
 # SLAGO Awards
 
-Одностраничный сайт голосования. До подключения базы он показывает все девять номинаций с временными номинантами `???`; после подключения данные берутся из Supabase.
+Одностраничный сайт голосования. Он использует тот же Supabase-проект и Discord-вход, что и Secret Gate Ratings. Таблицы Slago имеют префикс `slago_`, поэтому не конфликтуют с `profiles` и `votes` рейтинга.
 
 ## Подключение Supabase и Discord
 
-1. Создай проект в [Supabase](https://supabase.com/dashboard), открой **SQL Editor** и выполни содержимое `supabase/schema.sql`.
-2. В **Project Settings → API** скопируй `Project URL` и `anon public key`, затем вставь их в `SUPABASE_URL` и `SUPABASE_ANON_KEY` в `app.js`. Публичный anon key можно хранить на фронтенде: доступ защищают политики RLS в SQL.
-3. В [Discord Developer Portal](https://discord.com/developers/applications) создай приложение: **OAuth2 → General**. Скопируй Client ID и Client Secret.
-4. В Supabase открой **Authentication → Providers → Discord**, включи провайдер и вставь эти два значения. Redirect URL для Discord возьми из подсказки в настройках провайдера Supabase (обычно `https://<project-ref>.supabase.co/auth/v1/callback`).
-5. В **Authentication → URL Configuration** добавь адрес сайта в `Site URL` и `Redirect URLs`. Для локальной проверки: `http://localhost:5500` (или адрес твоего локального сервера). Для продакшена добавь домен полностью.
-6. Опубликуй папку на Vercel, Netlify, GitHub Pages или любом статическом хостинге и повтори шаг 5 с его URL.
+1. В Supabase-проекте Secret Gate Ratings открой **SQL Editor** и выполни содержимое `supabase/schema.sql`. Скрипт создаёт только `slago_nominations`, `slago_nominees` и `slago_votes`; существующие таблицы рейтинга он не меняет.
+2. Выполни `supabase/discord-sync-integration.sql` в том же SQL Editor. Этот SQL добавляет Discord ID к номинантам и RPC-синхронизацию. Функция связывает существующих номинантов по текущему нику на сервере или Discord username, а затем сохраняет их Discord ID для будущих обновлений. Неоднозначные совпадения пропускаются.
+3. В `app.js` уже указаны URL и publishable key проекта Secret Gate. Публичный ключ предназначен для браузера; доступ к таблицам ограничен RLS.
+4. Discord OAuth настраивается один раз в проекте Secret Gate: **Authentication → Providers → Discord**. Повторно создавать OAuth-приложение или пользователей не нужно.
+5. В **Authentication → URL Configuration** проекта Secret Gate добавь URL Slago в `Redirect URLs` (и настрой `Site URL` согласно основному сайту проекта). Для локальной проверки добавь адрес локального сервера, например `http://localhost:5500`.
+6. Опубликуй папку на статическом хостинге и добавь его URL в `Redirect URLs`.
+
+После входа Discord-пользователь получает ту же запись `auth.users`, что и в Secret Gate Ratings. Старые голоса из прежнего отдельного Supabase-проекта автоматически не переносятся.
+
+## Discord-ники и аватары
+
+Slago не импортирует весь сервер Discord в рейтинг и не создаёт отдельные записи пользователей. Используется уже настроенная Edge Function Secret Gate `sync-discord-members`: она получает участников сервера, обновляет профили рейтинга согласно своим правилам и одновременно обновляет совпавших кандидатов в `slago_nominees`. При успешной настройке авто-синхронизации из Secret Gate изменения ников и аватаров доходят до Slago примерно за пять минут.
+
+Для первого сопоставления имя в `slago_nominees.name` должно совпасть с ником на сервере Discord либо Discord username. После первого совпадения сохраняется `discord_id`, поэтому дальнейшие изменения имени поддерживаются автоматически. Если совпадения нет или оно неоднозначно, укажи Discord ID вручную в `slago_nominees.discord_id`; следующие циклы обновят имя и аватар. Синхронизация обновляет Slago-номинантов, но не добавляет участников в `profiles` и не меняет рейтинг.
+
+Чтобы включить автоматическое обновление, следуй разделу «Автоматическая синхронизация Discord каждые 5 минут» в README репозитория Secret Gate Ratings. В частности, потребуется развернуть обновлённую Edge Function и применить SQL из `supabase/discord-auto-sync.sql`.
 
 ## Номинанты
 
-Пока в каждой номинации лежит три `???`. Менять имена можно напрямую в Table Editor → `nominees`, либо SQL-запросом. Не меняй номинации во время открытого голосования без необходимости: уникальная пара `voter_id + nomination_id` не даст одному Discord-пользователю проголосовать з�� категорию дважды.
+Пока в каждой номинации лежит три `???`. Менять имена можно напрямую в Table Editor → `slago_nominees`, либо SQL-запросом к `slago_nominations` и `slago_nominees`. Не меняй номинации во время открытого голосования без необходимости: уникальная пара `voter_id + nomination_id` не даст одному Discord-пользователю проголосовать за категорию дважды.
 
 «Завоз года» из задания присутствует дважды, вторая карточка названа «Завоз года II», чтобы это были разные категории в базе.
 
 ## Главные номинации, аватары и порядок
 
-Для уже созданной базы один раз выполни `supabase/migrations/20260813_featured_nomination_design.sql` в SQL Editor. Миграция добавляет:
+Для базы, в которой таблицы Slago уже созданы, выполни `supabase/migrations/20260813_featured_nomination_design.sql` в SQL Editor. Миграция добавляет:
 
-- `nominations.is_featured`: включи флаг, чтобы номинация отображалась крупной в блоке «Главные номинации»;
-- `nominees.avatar_url`: вставь публичную HTTPS-ссылку на картинку — сайт покажет её рядом с именем кандидата;
-- `nominations.sort_order`: определяет порядок карточек. Измени значения в Table Editor или вызови `public.reorder_nominations(...)` из SQL Editor с UUID всех номинаций в нужной последовательности.
+- `slago_nominations.is_featured`: включи флаг, чтобы номинация отображалась крупной в блоке «Главные номинации»;
+- `slago_nominees.avatar_url`: вставь публичную HTTPS-ссылку на картинку — сайт покажет её рядом с именем кандидата;
+- `slago_nominations.sort_order`: определяет порядок карточек. Измени значения в Table Editor или вызови `public.reorder_slago_nominations(...)` из SQL Editor с UUID всех номинаций в нужной последовательности.

@@ -3,19 +3,19 @@
 -- Полный supabase/schema.sql повторно запускать не нужно.
 
 -- Позволяет сохранять собственного номинанта вместо кандидата из списка.
-alter table public.votes
+alter table public.slago_votes
   add column if not exists custom_nominee text;
 
 -- При собственном номинанте nominee_id остаётся пустым.
-alter table public.votes
+alter table public.slago_votes
   alter column nominee_id drop not null;
 
 -- Голос должен содержать ровно один вариант: кандидата из списка ИЛИ своё имя.
-alter table public.votes
-  drop constraint if exists votes_choice_check;
+alter table public.slago_votes
+  drop constraint if exists slago_votes_choice_check;
 
-alter table public.votes
-  add constraint votes_choice_check check (
+alter table public.slago_votes
+  add constraint slago_votes_choice_check check (
     (nominee_id is not null and custom_nominee is null)
     or
     (nominee_id is null and custom_nominee is not null and char_length(trim(custom_nominee)) between 1 and 70)
@@ -23,7 +23,7 @@ alter table public.votes
 
 -- Обновляет проверку соответствия кандидата номинации:
 -- для собственного номинанта nominee_id отсутствует, это допустимо.
-create or replace function public.ensure_matching_nominee()
+create or replace function public.ensure_matching_slago_nominee()
 returns trigger
 language plpgsql
 security definer
@@ -32,7 +32,7 @@ as $$
 begin
   if new.nominee_id is not null and not exists (
     select 1
-    from public.nominees
+    from public.slago_nominees
     where id = new.nominee_id
       and nomination_id = new.nomination_id
   ) then
@@ -42,3 +42,8 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists validate_slago_vote_nominee on public.slago_votes;
+create trigger validate_slago_vote_nominee
+  before insert or update on public.slago_votes
+  for each row execute function public.ensure_matching_slago_nominee();
