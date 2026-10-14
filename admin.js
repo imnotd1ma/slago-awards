@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://yerptwwacgjftjpsfmdi.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_FqrZcdtx_rizOPJBFWXg_cj7oS9X7';
+const SUPABASE_ANON_KEY = 'sb_publishable_FqrZcdtx_rizOPJBFULWXg_cj7oS9X7';
 const client = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = selector => document.querySelector(selector);
 const adminAuth = $('#adminAuth');
