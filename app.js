@@ -212,7 +212,7 @@ function renderClosedNominations() {
     const description = NOMINATION_DESCRIPTIONS[slug] || 'Особое признание участнику или моменту, который сделал этот год в Slago незабываемым.';
     const imageName = NOMINATION_IMAGES[slug];
     const image = imageName ? `<img src="images/nominations/${escapeHTML(imageName)}" alt="" loading="lazy">` : '<span>PNG</span>';
-    target.innerHTML = `<span class="closed-slide-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')} / ${String(state.nominations.length).padStart(2, '0')}</span><div class="nomination-art-placeholder" aria-hidden="true">${image}</div><h3>${escapeHTML(nomination.title)}</h3><p class="closed-slide-description">${escapeHTML(description)}</p>`;
+    target.innerHTML = `<span class="closed-slide-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')} / ${String(state.nominations.length).padStart(2, '0')}</span><div class="nomination-art-placeholder" aria-hidden="true">${image}</div><h3><span>${escapeHTML(nomination.title)}</span></h3><p class="closed-slide-description">${escapeHTML(description)}</p>`;
     target.classList.toggle('is-side', side);
     if (!side) target.classList.add('is-current');
   };
