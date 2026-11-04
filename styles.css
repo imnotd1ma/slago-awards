@@ -135,11 +135,12 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 @keyframes closed-card-in { from { opacity:.15; transform:scale(.92) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .closed-nomination-slide.is-current { animation:closed-card-in .55s cubic-bezier(.22,.8,.25,1) both; }
 .closed-slide-index { display:block; color:rgba(248,219,149,.7); font-size:10px; font-weight:800; letter-spacing:2px; }
-.nomination-art-placeholder { aspect-ratio:1.5; margin:25px auto 27px; display:grid; place-content:center; gap:8px; border:1px dashed rgba(248,219,149,.45); background:radial-gradient(circle at 50% 38%,rgba(248,219,149,.2),transparent 53%),rgba(10,25,65,.62); color:rgba(248,219,149,.7); }
+.nomination-art-placeholder { width:min(360px,100%); height:220px; margin:25px auto 75px; display:grid; place-items:center; gap:8px; border:0; background:transparent; color:rgba(248,219,149,.7); }
+.nomination-art-placeholder img { display:block; width:100%; height:100%; object-fit:contain; }
 .nomination-art-placeholder span { font:700 34px Unbounded,sans-serif; letter-spacing:2px; }
 .nomination-art-placeholder small { color:rgba(203,218,251,.45); font-size:10px; letter-spacing:1px; }
-.closed-nomination-slide h3 { margin:0; color:#fff1cf; font:600 clamp(22px,3vw,36px) Unbounded,sans-serif; line-height:1.2; }
-.closed-slide-description { width:min(570px,100%); margin:12px auto 0; color:var(--muted); font-size:13px; line-height:1.6; }
+.closed-nomination-slide h3 { min-height:52px; margin:0; color:#fff1cf; font:600 clamp(22px,3vw,36px) Unbounded,sans-serif; line-height:1.2; display:flex; align-items:center; justify-content:center; }
+.closed-slide-description { width:min(570px,100%); min-height:42px; margin:12px auto 0; color:var(--muted); font-size:13px; line-height:1.6; }
 .slider-arrow { width:54px; height:54px; border:1px solid rgba(248,219,149,.35); background:rgba(214,231,255,.07); color:var(--accent); font-size:25px; transition:background .2s,transform .2s,border-color .2s; }
 .slider-arrow:hover { transform:translateY(-2px); border-color:var(--accent); background:rgba(248,219,149,.13); }
 .slider-dots { display:flex; justify-content:center; flex-wrap:wrap; gap:7px; margin-top:18px; }
@@ -217,7 +218,7 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
   .nomination-slides { grid-template-columns:1fr; gap:0; }
   .closed-nomination-slide { min-height:390px; padding:31px 16px 28px; }
   .closed-nomination-slide.is-side { display:none; }
-  .nomination-art-placeholder { width:86%; margin:22px auto 24px; }
+  .nomination-art-placeholder { width:86%; height:190px; margin:22px auto 24px; }
   .nomination-art-placeholder span { font-size:27px; }
   .slider-arrow { width:38px; height:44px; font-size:20px; }
   .countdown-panel { margin-top:66px; padding:28px 12px 31px; }

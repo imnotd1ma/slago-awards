@@ -34,18 +34,32 @@ let toastTimer;
 let countdownTimer;
 
 const NOMINATION_DESCRIPTIONS = {
-  'legend-year': 'Человек, чьи поступки и истории стали частью Slago в этом году.',
-  'meme-year': 'Мем, который чаще всего вспоминали, пересылали и цитировали.',
-  'active-year': 'Самый заметный участник сообщества, который всегда был в движении.',
+  'legend-year': 'Человек, чьи поступки и истории стали частью Secret Gate в этом году.',
+  'meme-year': 'Человек, который стал самым мемным на сервере.',
+  'active-year': 'Самый заметный участник сообщества, который всегда был на сервере.',
   'xer-year': 'За яркие моменты, сильные эмоции и неповторимый стиль.',
-  'golden-burger': 'За главный гастрономический хит и самые убедительные разговоры о еде.',
+  'golden-burger': 'За лютую жирность и самые убедительные разговоры о еде.',
   'zavoz-year': 'За событие, которое обсуждали дольше всего.',
-  'doter-year': 'За самые запоминающиеся игровые моменты года.',
-  'ivan-zolo-year': 'За самые яркие моменты, связанные с Иваном Золо.',
+  'doter-year': 'За самого гениального дотера на SG.',
+  'ivan-zolo-year': 'За самые тупые моменты, с которых смеялся весь SG.',
   'toxic-year': 'За чемпионский уровень подколов и спорных высказываний.',
   'charisma-year': 'За обаяние, которое невозможно не заметить.',
   'good-guy-year': 'За поддержку, доброту и готовность прийти на помощь.',
   'sex-symbol-year': 'За стиль и харизму, покорившие сообщество.'
+};
+const NOMINATION_IMAGES = {
+  'legend-year': 'legend-year.png',
+  'meme-year': 'meme-year.png',
+  'active-year': 'active-year.png',
+  'xer-year': 'cs-year.png',
+  'golden-burger': 'golden-burger.png',
+  'zavoz-year': 'zavoz-year.png',
+  'doter-year': 'dota-year.png',
+  'ivan-zolo-year': 'ivan-zolo-year.png',
+  'toxic-year': 'toxic-year.png',
+  'charisma-year': 'harizma-year.png',
+  'kind-year': 'kind-year.png',
+  'sex-symbol-year': 'sex-symbol-year.png'
 };
 
 function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]); }
@@ -195,7 +209,9 @@ function renderClosedNominations() {
     if (!side) void target.offsetWidth;
     const slug = nomination.slug || nomination.id;
     const description = NOMINATION_DESCRIPTIONS[slug] || 'Особое признание участнику или моменту, который сделал этот год в Slago незабываемым.';
-    target.innerHTML = `<span class="closed-slide-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')} / ${String(state.nominations.length).padStart(2, '0')}</span><div class="nomination-art-placeholder" aria-hidden="true"><span>PNG</span><small>${escapeHTML(slug)}</small></div><h3>${escapeHTML(nomination.title)}</h3><p class="closed-slide-description">${escapeHTML(description)}</p>`;
+    const imageName = NOMINATION_IMAGES[slug];
+    const image = imageName ? `<img src="images/nominations/${escapeHTML(imageName)}" alt="" loading="lazy">` : '<span>PNG</span>';
+    target.innerHTML = `<span class="closed-slide-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')} / ${String(state.nominations.length).padStart(2, '0')}</span><div class="nomination-art-placeholder" aria-hidden="true">${image}</div><h3>${escapeHTML(nomination.title)}</h3><p class="closed-slide-description">${escapeHTML(description)}</p>`;
     target.classList.toggle('is-side', side);
     if (!side) target.classList.add('is-current');
   };
