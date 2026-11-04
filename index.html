@@ -64,7 +64,22 @@
           <div><p class="eyebrow">БЮЛЛЕТЕНЬ</p><h2>Номинации</h2></div>
           <div class="progress"><span id="progressText">0 из 12 выбрано</span><div><i id="progressBar"></i></div></div>
         </div>
-        
+        <div id="closedVoting" class="closed-voting" hidden>
+          <div class="nomination-slider" aria-live="polite">
+            <button id="nominationPrev" class="slider-arrow" type="button" aria-label="Предыдущая номинация">←</button>
+            <div class="nomination-slides">
+              <article id="closedNominationPrevious" class="closed-nomination-slide is-side"></article>
+              <article id="closedNominationSlide" class="closed-nomination-slide is-current"></article>
+              <article id="closedNominationNext" class="closed-nomination-slide is-side"></article>
+            </div>
+            <button id="nominationNext" class="slider-arrow" type="button" aria-label="Следующая номинация">→</button>
+          </div>
+          <div class="slider-dots" id="sliderDots" aria-label="Выбрать номинацию"></div>
+          <section class="countdown-panel" aria-live="polite">
+            <span id="countdownLabel">До начала голосования</span>
+            <strong id="votingCountdown">Дата начала появится позже</strong>
+          </section>
+        </div>
         <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
         <div class="submit-wrap reveal">
           <p id="submitHint">Выбери кандидата в каждой номинации.</p>

@@ -21,7 +21,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, setupMessage: '' };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, setupMessage: '', closedSlide: 0 };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const adminLink = document.querySelector('#adminLink');
@@ -31,6 +31,22 @@ const progressText = document.querySelector('#progressText');
 const progressBar = document.querySelector('#progressBar');
 const submitHint = document.querySelector('#submitHint');
 let toastTimer;
+let countdownTimer;
+
+const NOMINATION_DESCRIPTIONS = {
+  'legend-year': 'Человек, чьи поступки и истории стали частью Slago в этом году.',
+  'meme-year': 'Мем, который чаще всего вспоминали, пересылали и цитировали.',
+  'active-year': 'Самый заметный участник сообщества, который всегда был в движении.',
+  'xer-year': 'За яркие моменты, сильные эмоции и неповторимый стиль.',
+  'golden-burger': 'За главный гастрономический хит и самые убедительные разговоры о еде.',
+  'zavoz-year': 'За событие, которое обсуждали дольше всего.',
+  'doter-year': 'За самые запоминающиеся игровые моменты года.',
+  'ivan-zolo-year': 'За самые яркие моменты, связанные с Иваном Золо.',
+  'toxic-year': 'За чемпионский уровень подколов и спорных высказываний.',
+  'charisma-year': 'За обаяние, которое невозможно не заметить.',
+  'good-guy-year': 'За поддержку, доброту и готовность прийти на помощь.',
+  'sex-symbol-year': 'За стиль и харизму, покорившие сообщество.'
+};
 
 function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]); }
 function avatarMarkup(person) {
@@ -122,6 +138,19 @@ function showOtherNomineeSuggestions(input) {
   list.hidden = false;
 }
 function render() {
+  const closedVoting = document.querySelector('#closedVoting');
+  const sectionHeading = document.querySelector('.section-heading');
+  const submitWrap = document.querySelector('.submit-wrap');
+  const isClosed = !state.votingAccepting;
+  closedVoting.hidden = !isClosed;
+  grid.hidden = isClosed;
+  sectionHeading.classList.toggle('is-closed-view', isClosed);
+  submitWrap.hidden = isClosed;
+  if (isClosed) {
+    renderClosedNominations();
+    updateProgress();
+    return;
+  }
   const nominationCard = nomination => {
     const choice = state.choices.get(nomination.id);
     const isZavoz = nomination.slug?.startsWith('zavoz-year');
@@ -146,6 +175,48 @@ function render() {
     updateChoiceUI(nominationId);
   }));
   updateProgress();
+}
+function renderClosedNominations() {
+  const slide = document.querySelector('#closedNominationSlide');
+  const previousSlide = document.querySelector('#closedNominationPrevious');
+  const nextSlide = document.querySelector('#closedNominationNext');
+  const dots = document.querySelector('#sliderDots');
+  if (!state.nominations.length) {
+    slide.innerHTML = '<p class="closed-slide-description">Номинации скоро появятся.</p>';
+    previousSlide.innerHTML = '';
+    nextSlide.innerHTML = '';
+    dots.replaceChildren();
+    return;
+  }
+  state.closedSlide = (state.closedSlide + state.nominations.length) % state.nominations.length;
+  const getNomination = offset => state.nominations[(state.closedSlide + offset + state.nominations.length) % state.nominations.length];
+  const renderSlide = (target, nomination, side = false) => {
+    target.classList.remove('is-current');
+    if (!side) void target.offsetWidth;
+    const slug = nomination.slug || nomination.id;
+    const description = NOMINATION_DESCRIPTIONS[slug] || 'Особое признание участнику или моменту, который сделал этот год в Slago незабываемым.';
+    target.innerHTML = `<span class="closed-slide-index">НОМИНАЦИЯ ${String(nomination.index).padStart(2, '0')} / ${String(state.nominations.length).padStart(2, '0')}</span><div class="nomination-art-placeholder" aria-hidden="true"><span>PNG</span><small>${escapeHTML(slug)}</small></div><h3>${escapeHTML(nomination.title)}</h3><p class="closed-slide-description">${escapeHTML(description)}</p>`;
+    target.classList.toggle('is-side', side);
+    if (!side) target.classList.add('is-current');
+  };
+  renderSlide(previousSlide, getNomination(-1), true);
+  renderSlide(slide, getNomination(0));
+  renderSlide(nextSlide, getNomination(1), true);
+  dots.innerHTML = state.nominations.map((item, index) => `<button class="slider-dot ${index === state.closedSlide ? 'is-active' : ''}" type="button" aria-label="Номинация ${index + 1}: ${escapeHTML(item.title)}" aria-current="${index === state.closedSlide}"></button>`).join('');
+  dots.querySelectorAll('.slider-dot').forEach((button, index) => button.addEventListener('click', () => { state.closedSlide = index; renderClosedNominations(); }));
+}
+function updateCountdown() {
+  const output = document.querySelector('#votingCountdown');
+  if (!output) return;
+  const target = state.startsAt ? new Date(state.startsAt).getTime() : NaN;
+  if (!Number.isFinite(target)) { output.textContent = 'Дата начала появится позже'; return; }
+  const remaining = target - Date.now();
+  if (remaining <= 0) { output.textContent = 'Следующий старт будет объявлен'; return; }
+  const days = Math.floor(remaining / 86400000);
+  const hours = Math.floor(remaining % 86400000 / 3600000);
+  const minutes = Math.floor(remaining % 3600000 / 60000);
+  const seconds = Math.floor(remaining % 60000 / 1000);
+  output.textContent = [days && `${days} д`, `${hours} ч`, `${minutes} мин`, `${seconds} сек`].filter(Boolean).join('  ·  ');
 }
 let nominationsRefreshTimer;
 let nominationChannelConnected = false;
@@ -206,6 +277,7 @@ async function loadVotingStatus() {
   const { data, error } = await supabaseClient.rpc('get_slago_vote_status');
   if (error || !data) { console.warn('Не удалось получить статус голосования:', error); return; }
   state.votingAccepting = data.accepting_votes === true;
+  state.startsAt = data.starts_at || null;
   const waitingForStart = data.is_open && data.starts_at && Date.now() < new Date(data.starts_at).getTime();
   const statusText = state.votingAccepting ? 'Голосование открыто' : waitingForStart ? 'Стартует по расписанию' : 'Голосование закрыто';
   votingStatus?.classList.toggle('is-closed', !state.votingAccepting);
@@ -215,6 +287,8 @@ async function loadVotingStatus() {
   document.querySelector('#votingWindowStatus').textContent = statusText;
   document.querySelector('#votingStartsDisplay').textContent = formatMoscow(data.starts_at);
   document.querySelector('#votingEndsDisplay').textContent = formatMoscow(data.ends_at);
+  updateCountdown();
+  render();
   updateProgress();
 }
 authButton.addEventListener('click', async () => {
@@ -233,6 +307,9 @@ submitButton.addEventListener('click', async () => {
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });
 render();
+document.querySelector('#nominationPrev').addEventListener('click', () => { state.closedSlide--; renderClosedNominations(); });
+document.querySelector('#nominationNext').addEventListener('click', () => { state.closedSlide++; renderClosedNominations(); });
+countdownTimer = setInterval(updateCountdown, 1000);
 if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); loadVotingStatus(); setInterval(loadVotingStatus, 30000); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
 window.addEventListener('load', () => document.body.classList.add('is-ready'));
