@@ -134,13 +134,21 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .closed-nomination-slide.is-current { opacity:1; transform:scale(1); filter:none; }
 @keyframes closed-card-in { from { opacity:.15; transform:scale(.92) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .closed-nomination-slide.is-current { animation:closed-card-in .55s cubic-bezier(.22,.8,.25,1) both; }
+@keyframes closed-card-next { from { opacity:.15; transform:translateX(34px) scale(.94); } to { opacity:1; transform:translateX(0) scale(1); } }
+@keyframes closed-card-previous { from { opacity:.15; transform:translateX(-34px) scale(.94); } to { opacity:1; transform:translateX(0) scale(1); } }
+@keyframes closed-side-next { from { opacity:.08; transform:translateX(25px) scale(.84); } to { opacity:.3; transform:translateX(0) scale(.88); } }
+@keyframes closed-side-previous { from { opacity:.08; transform:translateX(-25px) scale(.84); } to { opacity:.3; transform:translateX(0) scale(.88); } }
+.nomination-slides.is-next .closed-nomination-slide.is-current { animation:closed-card-next .58s cubic-bezier(.22,.8,.25,1) both; }
+.nomination-slides.is-previous .closed-nomination-slide.is-current { animation:closed-card-previous .58s cubic-bezier(.22,.8,.25,1) both; }
+.nomination-slides.is-next .closed-nomination-slide.is-side { animation:closed-side-next .58s cubic-bezier(.22,.8,.25,1) both; }
+.nomination-slides.is-previous .closed-nomination-slide.is-side { animation:closed-side-previous .58s cubic-bezier(.22,.8,.25,1) both; }
 .closed-slide-index { display:block; color:rgba(248,219,149,.7); font-size:10px; font-weight:800; letter-spacing:2px; }
 .nomination-art-placeholder { width:min(360px,100%); height:220px; margin:25px auto 75px; display:grid; place-items:center; gap:8px; border:0; background:transparent; color:rgba(248,219,149,.7); }
 .nomination-art-placeholder img { display:block; width:100%; height:100%; object-fit:contain; }
 .nomination-art-placeholder span { font:700 34px Unbounded,sans-serif; letter-spacing:2px; }
 .nomination-art-placeholder small { color:rgba(203,218,251,.45); font-size:10px; letter-spacing:1px; }
-.closed-nomination-slide h3 { min-height:52px; margin:0; color:#fff1cf; font:600 clamp(22px,3vw,36px) Unbounded,sans-serif; line-height:1.2; display:flex; align-items:center; justify-content:center; }
-.closed-slide-description { width:min(570px,100%); min-height:42px; margin:12px auto 0; color:var(--muted); font-size:13px; line-height:1.6; }
+.closed-nomination-slide h3 { height:4.2em; min-height:4.2em; max-height:4.2em; margin:0; color:#fff1cf; font:600 clamp(22px,3vw,36px) Unbounded,sans-serif; line-height:1.2; display:-webkit-box; align-items:center; justify-content:center; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
+.closed-slide-description { width:min(570px,100%); height:4.8em; min-height:4.8em; max-height:4.8em; margin:12px auto 0; color:var(--muted); font-size:13px; line-height:1.6; display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
 .slider-arrow { width:54px; height:54px; border:1px solid rgba(248,219,149,.35); background:rgba(214,231,255,.07); color:var(--accent); font-size:25px; transition:background .2s,transform .2s,border-color .2s; }
 .slider-arrow:hover { transform:translateY(-2px); border-color:var(--accent); background:rgba(248,219,149,.13); }
 .slider-dots { display:flex; justify-content:center; flex-wrap:wrap; gap:7px; margin-top:18px; }

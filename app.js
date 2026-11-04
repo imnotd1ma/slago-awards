@@ -21,7 +21,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, setupMessage: '', closedSlide: 0 };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const adminLink = document.querySelector('#adminLink');
@@ -194,6 +194,7 @@ function renderClosedNominations() {
   const slide = document.querySelector('#closedNominationSlide');
   const previousSlide = document.querySelector('#closedNominationPrevious');
   const nextSlide = document.querySelector('#closedNominationNext');
+  const slides = document.querySelector('.nomination-slides');
   const dots = document.querySelector('#sliderDots');
   if (!state.nominations.length) {
     slide.innerHTML = '<p class="closed-slide-description">Номинации скоро появятся.</p>';
@@ -218,8 +219,18 @@ function renderClosedNominations() {
   renderSlide(previousSlide, getNomination(-1), true);
   renderSlide(slide, getNomination(0));
   renderSlide(nextSlide, getNomination(1), true);
+  slides.classList.remove('is-next', 'is-previous');
+  if (state.closedDirection) {
+    void slides.offsetWidth;
+    slides.classList.add(state.closedDirection > 0 ? 'is-next' : 'is-previous');
+  }
+  state.closedDirection = 0;
   dots.innerHTML = state.nominations.map((item, index) => `<button class="slider-dot ${index === state.closedSlide ? 'is-active' : ''}" type="button" aria-label="Номинация ${index + 1}: ${escapeHTML(item.title)}" aria-current="${index === state.closedSlide}"></button>`).join('');
-  dots.querySelectorAll('.slider-dot').forEach((button, index) => button.addEventListener('click', () => { state.closedSlide = index; renderClosedNominations(); }));
+  dots.querySelectorAll('.slider-dot').forEach((button, index) => button.addEventListener('click', () => {
+    state.closedDirection = index > state.closedSlide ? 1 : index < state.closedSlide ? -1 : 0;
+    state.closedSlide = index;
+    renderClosedNominations();
+  }));
 }
 function updateCountdown() {
   const output = document.querySelector('#votingCountdown');
@@ -323,8 +334,8 @@ submitButton.addEventListener('click', async () => {
   toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
 });
 render();
-document.querySelector('#nominationPrev').addEventListener('click', () => { state.closedSlide--; renderClosedNominations(); });
-document.querySelector('#nominationNext').addEventListener('click', () => { state.closedSlide++; renderClosedNominations(); });
+document.querySelector('#nominationPrev').addEventListener('click', () => { state.closedDirection = -1; state.closedSlide--; renderClosedNominations(); });
+document.querySelector('#nominationNext').addEventListener('click', () => { state.closedDirection = 1; state.closedSlide++; renderClosedNominations(); });
 countdownTimer = setInterval(updateCountdown, 1000);
 if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); loadVotingStatus(); setInterval(loadVotingStatus, 30000); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
