@@ -21,7 +21,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, endsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const adminLink = document.querySelector('#adminLink');
@@ -234,11 +234,22 @@ function renderClosedNominations() {
 }
 function updateCountdown() {
   const output = document.querySelector('#votingCountdown');
-  if (!output) return;
-  const target = state.startsAt ? new Date(state.startsAt).getTime() : NaN;
-  if (!Number.isFinite(target)) { output.textContent = 'Дата начала появится позже'; return; }
+  const label = document.querySelector('#countdownLabel');
+  const dateOutput = document.querySelector('#countdownDate');
+  if (!output || !label) return;
+  const targetValue = state.votingAccepting ? state.endsAt : state.startsAt;
+  const target = targetValue ? new Date(targetValue).getTime() : NaN;
+  const formatDate = value => value ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) : '';
+  label.textContent = state.votingAccepting ? 'До конца голосования' : 'До начала голосования';
+  if (dateOutput) dateOutput.textContent = Number.isFinite(target) ? `${state.votingAccepting ? 'Окончание' : 'Начало'}: ${formatDate(targetValue)} · МСК (UTC+3)` : '';
+  if (!Number.isFinite(target)) { output.textContent = state.votingAccepting ? 'Дата окончания появится позже' : 'Дата начала появится позже'; return; }
   const remaining = target - Date.now();
-  if (remaining <= 0) { output.textContent = 'Следующий старт будет объявлен'; return; }
+  if (remaining <= 0) {
+    label.textContent = state.votingAccepting ? 'До конца голосования' : 'Голосование закрыто';
+    output.textContent = state.votingAccepting ? 'Голосование завершается' : 'Следующий старт будет объявлен';
+    if (dateOutput && !state.votingAccepting) dateOutput.textContent = '';
+    return;
+  }
   const days = Math.floor(remaining / 86400000);
   const hours = Math.floor(remaining % 86400000 / 3600000);
   const minutes = Math.floor(remaining % 3600000 / 60000);
@@ -305,15 +316,12 @@ async function loadVotingStatus() {
   if (error || !data) { console.warn('Не удалось получить статус голосования:', error); return; }
   state.votingAccepting = data.accepting_votes === true;
   state.startsAt = data.starts_at || null;
+  state.endsAt = data.ends_at || null;
   const waitingForStart = data.is_open && data.starts_at && Date.now() < new Date(data.starts_at).getTime();
   const statusText = state.votingAccepting ? 'Голосование открыто' : waitingForStart ? 'Стартует по расписанию' : 'Голосование закрыто';
   votingStatus?.classList.toggle('is-closed', !state.votingAccepting);
   votingStatus?.classList.toggle('is-waiting', !state.votingAccepting && Boolean(waitingForStart));
   if (votingStatus) votingStatus.innerHTML = `<i></i> ${statusText}`;
-  const formatMoscow = value => value ? new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) : 'не задано';
-  document.querySelector('#votingWindowStatus').textContent = statusText;
-  document.querySelector('#votingStartsDisplay').textContent = formatMoscow(data.starts_at);
-  document.querySelector('#votingEndsDisplay').textContent = formatMoscow(data.ends_at);
   updateCountdown();
   render();
   updateProgress();

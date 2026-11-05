@@ -39,12 +39,12 @@
           <p class="eyebrow">SLAGO COMMUNITY PRESENTS</p>
           <h1>Те, кто сделал<br /><em>этот год.</em></h1>
           <p class="intro">Выбери людей, моменты и завозы, которые заслужили остаться в истории комьюнити.</p>
+          <p class="event-date">ПРЕМИЯ СОСТОИТСЯ 14 ДЕКАБРЯ 2026 ГОДА</p>
           <a href="#ballot" class="gold-button">Начать голосование <span>↓</span></a>
         </div>
-        <div class="hero-emblem" aria-hidden="true">
-          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="rays"></div>
-          <div class="trophy"><span>★</span><b>SLAGO</b><small>AWARDS<br />2026</small></div>
-          <p>ВЫБОР КОМЬЮНИТИ</p>
+        <div class="hero-emblem">
+          <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div><div class="rays" aria-hidden="true"></div>
+          <figure class="trophy"><img src="images/slago.png" alt="Статуэтка SLAGO Awards" /><figcaption>СТАТУЭТКА SLAGO AWARDS<br /><small>ПРЕМИЯ 2026</small></figcaption></figure>
         </div>
       </section>
 
@@ -56,10 +56,6 @@
 
       <section class="ballot-section" id="ballot">
 
-        <div id="votingSchedule" class="voting-schedule" aria-live="polite">
-          <div class="voting-window-meta"><strong id="votingWindowStatus">Проверяем статус</strong><span>Московское время · UTC+3</span></div>
-          <div class="voting-window-times"><div><small>Начало голосования</small><strong id="votingStartsDisplay">Загружается…</strong></div><span class="voting-window-divider" aria-hidden="true">→</span><div><small>Окончание голосования</small><strong id="votingEndsDisplay">Загружается…</strong></div></div>
-        </div>
         <div class="section-heading reveal">
           <div><p class="eyebrow">БЮЛЛЕТЕНЬ</p><h2>Номинации</h2></div>
           <div class="progress"><span id="progressText">0 из 12 выбрано</span><div><i id="progressBar"></i></div></div>
@@ -75,11 +71,12 @@
             <button id="nominationNext" class="slider-arrow" type="button" aria-label="Следующая номинация">→</button>
           </div>
           <div class="slider-dots" id="sliderDots" aria-label="Выбрать номинацию"></div>
-          <section class="countdown-panel" aria-live="polite">
-            <span id="countdownLabel">До начала голосования</span>
-            <strong id="votingCountdown">Дата начала появится позже</strong>
-          </section>
         </div>
+        <section class="countdown-panel" aria-live="polite">
+          <span id="countdownLabel">ДО НАЧАЛА ГОЛОСОВАНИЯ</span>
+          <strong id="votingCountdown">Дата начала появится позже</strong>
+          <small id="countdownDate" class="countdown-date"></small>
+        </section>
         <div id="nominationGrid" class="nomination-grid" aria-live="polite"></div>
         <div class="submit-wrap reveal">
           <p id="submitHint">Выбери кандидата в каждой номинации.</p>
