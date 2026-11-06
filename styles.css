@@ -280,3 +280,14 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .nomination-candidates .candidate:hover { transform:translateY(-3px) scale(.88); }
 .nomination-candidates .candidate.is-current:hover { transform:translateY(-4px) scale(1); }
 .nomination-candidates .candidate.is-adjacent:hover { transform:translateY(-3px) scale(.96); }
+.candidate-slider { width:min(1180px,100%); grid-template-columns:42px minmax(0,1fr) 42px; gap:10px; margin:26px auto 0; }
+.candidate-slider .nomination-candidates { display:flex; grid-template-columns:none; min-height:220px; align-items:center; margin:0; }
+.candidate-slider-arrow { width:42px; height:42px; font-size:20px; }
+.candidate-slider-dots { margin-top:10px; }
+.candidate-slider-dots .slider-dot { width:7px; height:7px; }
+.candidate-slider-dots .slider-dot[aria-current="true"] { transform:scale(1.35); border-color:var(--accent); background:var(--accent); box-shadow:0 0 12px rgba(248,219,149,.6); }
+@media(max-width:760px) {
+  .candidate-slider { grid-template-columns:32px minmax(0,1fr) 32px; gap:5px; margin-top:22px; }
+  .candidate-slider .nomination-candidates { min-height:170px; padding-left:calc((100% - 112px)/2); padding-right:calc((100% - 112px)/2); }
+  .candidate-slider-arrow { width:32px; height:38px; font-size:17px; }
+}

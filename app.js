@@ -198,6 +198,30 @@ function render() {
     return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
+  grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
+    const article = carousel.parentElement;
+    const slider = document.createElement('div');
+    slider.className = 'nomination-slider candidate-slider';
+    slider.dataset.nominationSlider = carousel.closest('.nomination').dataset.nominationCard;
+    const previous = document.createElement('button');
+    previous.className = 'slider-arrow candidate-slider-arrow';
+    previous.type = 'button';
+    previous.dataset.candidatePrev = '';
+    previous.setAttribute('aria-label', 'Предыдущий кандидат');
+    previous.textContent = '←';
+    const next = document.createElement('button');
+    next.className = 'slider-arrow candidate-slider-arrow';
+    next.type = 'button';
+    next.dataset.candidateNext = '';
+    next.setAttribute('aria-label', 'Следующий кандидат');
+    next.textContent = '→';
+    article.insertBefore(slider, carousel);
+    slider.append(previous, carousel, next);
+    const dots = document.createElement('div');
+    dots.className = 'slider-dots candidate-slider-dots';
+    dots.setAttribute('aria-label', 'Выбрать кандидата');
+    article.insertBefore(dots, slider.nextSibling);
+  });
   preservedCards.forEach((saved, nominationId) => {
     const card = grid.querySelector(`[data-nomination-card="${CSS.escape(nominationId)}"]`);
     const input = card?.querySelector('.custom-input');
@@ -214,6 +238,13 @@ function render() {
       button.querySelector('.candidate-name').before(order);
     });
     carousel.dataset.count = String(candidates.length);
+    if (candidates.length < 2) {
+      carousel.closest('.candidate-slider')?.querySelectorAll('.candidate-slider-arrow').forEach(button => { button.hidden = true; });
+    }
+    const dots = carousel.closest('.candidate-slider')?.nextElementSibling;
+    if (dots) {
+      dots.innerHTML = candidates.map((candidate, index) => `<button class="slider-dot ${index === 0 ? 'is-active' : ''}" type="button" data-candidate-index="${index}" aria-label="Кандидат ${index + 1}: ${escapeHTML(candidate.querySelector('.candidate-name')?.textContent || '')}" aria-current="${index === 0}"></button>`).join('');
+    }
     if (candidates.length > 1) {
       const before = candidates.map(candidate => candidate.cloneNode(true));
       const after = candidates.map(candidate => candidate.cloneNode(true));
@@ -257,10 +288,38 @@ function render() {
     const finishDrag = event => {
       if (!dragging) return; dragging = false; carousel.classList.remove('is-dragging');
       if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
-      if (moved) { carousel.dataset.dragged = 'true'; setTimeout(() => delete carousel.dataset.dragged, 0); }
+      if (moved) {
+        carousel.dataset.dragged = 'true';
+        setTimeout(() => delete carousel.dataset.dragged, 250);
+      }
       settleCandidateCarousel(carousel);
     };
     carousel.addEventListener('pointerup', finishDrag); carousel.addEventListener('pointercancel', finishDrag);
+  });
+  grid.querySelectorAll('.candidate-slider').forEach(slider => {
+    const carousel = slider.querySelector('.nomination-candidates');
+    const dots = slider.nextElementSibling?.querySelectorAll('.slider-dot') || [];
+    const syncDots = index => dots.forEach((dot, dotIndex) => {
+      const active = dotIndex === index;
+      dot.classList.toggle('is-active', active);
+      dot.setAttribute('aria-current', String(active));
+    });
+    const move = offset => {
+      const count = Number(carousel?.dataset.count || 0);
+      if (!carousel || count < 2) return;
+      const current = Number(carousel.dataset.activeIndex || 0);
+      const index = (current + offset + count) % count;
+      carousel.dataset.activeIndex = String(index);
+      centerCandidate(carousel, carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`));
+      syncDots(index);
+    };
+    slider.querySelector('[data-candidate-prev]')?.addEventListener('click', () => move(-1));
+    slider.querySelector('[data-candidate-next]')?.addEventListener('click', () => move(1));
+    dots.forEach((dot, index) => dot.addEventListener('click', () => {
+      carousel.dataset.activeIndex = String(index);
+      centerCandidate(carousel, carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`));
+      syncDots(index);
+    }));
   });
   grid.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
     if (button.closest('.nomination-candidates')?.dataset.dragged === 'true') return;
@@ -299,6 +358,12 @@ function updateCarouselClasses(carousel, activeIndex) {
     const distance = currentIndex == null ? Infinity : Math.abs(index - currentIndex);
     candidate.classList.toggle('is-current', distance === 0);
     candidate.classList.toggle('is-adjacent', distance === 1);
+  });
+  const realIndex = currentIndex == null ? activeIndex : Number(candidates[currentIndex]?.dataset.carouselIndex ?? activeIndex);
+  carousel.closest('.candidate-slider')?.nextElementSibling?.querySelectorAll('.slider-dot').forEach((dot, index) => {
+    const active = index === realIndex;
+    dot.classList.toggle('is-active', active);
+    dot.setAttribute('aria-current', String(active));
   });
 }
 function settleCandidateCarousel(carousel) {
