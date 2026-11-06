@@ -271,31 +271,74 @@ function render() {
   });
   grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
     let dragging = false; let moved = false; let startX = 0; let startScroll = 0; let pressedCandidate = null;
-    let scrollTimer;
+    let lastX = 0; let lastTime = 0; let dragVelocity = 0;
+    let scrollTimer; let inertiaFrame = 0; let wheelFrame = 0; let wheelTarget = 0;
     carousel.addEventListener('dragstart', event => event.preventDefault());
+    carousel.addEventListener('wheel', event => {
+      if (!event.shiftKey) return;
+      event.preventDefault();
+      if (!wheelFrame) wheelTarget = carousel.scrollLeft;
+      const multiplier = event.deltaMode === 1 ? 18 : event.deltaMode === 2 ? carousel.clientWidth : 1;
+      wheelTarget = Math.max(0, Math.min(carousel.scrollWidth - carousel.clientWidth, wheelTarget + (event.deltaY || event.deltaX) * multiplier));
+      if (wheelFrame) return;
+      const animateWheel = () => {
+        const distance = wheelTarget - carousel.scrollLeft;
+        carousel.scrollLeft += distance * 0.18;
+        if (Math.abs(distance) < 0.5) {
+          carousel.scrollLeft = wheelTarget;
+          wheelFrame = 0;
+          return;
+        }
+        wheelFrame = requestAnimationFrame(animateWheel);
+      };
+      wheelFrame = requestAnimationFrame(animateWheel);
+    }, { passive: false });
     carousel.addEventListener('pointerdown', event => {
       if (event.pointerType !== 'mouse' || event.button !== 0) return;
-      dragging = true; moved = false; pressedCandidate = event.target.closest('.candidate'); startX = event.clientX; startScroll = carousel.scrollLeft;
+      cancelAnimationFrame(inertiaFrame); inertiaFrame = 0;
+      dragging = true; moved = false; pressedCandidate = event.target.closest('.candidate'); startX = event.clientX; startScroll = carousel.scrollLeft; lastX = event.clientX; lastTime = performance.now(); dragVelocity = 0;
       carousel.classList.add('is-dragging'); carousel.setPointerCapture(event.pointerId);
     });
     carousel.addEventListener('pointermove', event => {
       if (!dragging) return;
-      const delta = event.clientX - startX; if (Math.abs(delta) > 8) moved = true; carousel.scrollLeft = startScroll - delta;
+      const now = performance.now();
+      const delta = event.clientX - startX;
+      const frameDelta = event.clientX - lastX;
+      const frameTime = Math.max(1, now - lastTime);
+      if (Math.abs(delta) > 8) moved = true;
+      dragVelocity = -(frameDelta / frameTime) * 16;
+      carousel.scrollLeft = startScroll - delta;
+      lastX = event.clientX; lastTime = now;
     });
     carousel.addEventListener('scroll', () => {
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => settleCandidateCarousel(carousel), 90);
+      scrollTimer = setTimeout(() => {
+        if (!dragging && !inertiaFrame && !wheelFrame && carousel.dataset.animating !== 'true') settleCandidateCarousel(carousel);
+      }, 90);
     }, { passive: true });
     const finishDrag = event => {
-      if (!dragging) return; dragging = false; carousel.classList.remove('is-dragging');
+      if (!dragging) return; dragging = false;
       if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
       if (!moved && pressedCandidate && !pressedCandidate.classList.contains('is-clone')) pressedCandidate.click();
       pressedCandidate = null;
       if (moved) {
         carousel.dataset.dragged = 'true';
         setTimeout(() => delete carousel.dataset.dragged, 80);
+        const glide = () => {
+          carousel.scrollLeft += dragVelocity;
+          dragVelocity *= 0.9;
+          if (Math.abs(dragVelocity) > 0.35) inertiaFrame = requestAnimationFrame(glide);
+          else {
+            inertiaFrame = 0;
+            carousel.classList.remove('is-dragging');
+            settleCandidateCarousel(carousel);
+          }
+        };
+        inertiaFrame = requestAnimationFrame(glide);
+      } else {
+        carousel.classList.remove('is-dragging');
+        settleCandidateCarousel(carousel);
       }
-      settleCandidateCarousel(carousel);
     };
     carousel.addEventListener('pointerup', finishDrag); carousel.addEventListener('pointercancel', finishDrag);
   });
@@ -353,7 +396,16 @@ function render() {
 function centerCandidate(carousel, candidate, smooth = true) {
   if (!candidate) return;
   const left = candidate.offsetLeft - (carousel.clientWidth - candidate.offsetWidth) / 2;
-  carousel.scrollTo({ left, behavior: smooth ? 'smooth' : 'auto' });
+  if (smooth) {
+    clearTimeout(carousel._smoothTimer);
+    carousel.dataset.animating = 'true';
+    carousel.scrollTo({ left, behavior: 'smooth' });
+    carousel._smoothTimer = setTimeout(() => { delete carousel.dataset.animating; settleCandidateCarousel(carousel); }, 500);
+    return;
+  }
+  carousel.classList.add('is-recentering');
+  carousel.scrollLeft = left;
+  requestAnimationFrame(() => carousel.classList.remove('is-recentering'));
 }
 function updateCarouselClasses(carousel, activeIndex) {
   const count = Number(carousel.dataset.count);

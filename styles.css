@@ -243,10 +243,11 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 }
 
 /* Candidate carousel in the open ballot */
-.nomination-candidates { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:18px; width:min(1100px,100%); margin:34px auto 0; padding:10px max(20px,calc((100% - 980px)/2)) 18px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none; touch-action:pan-x; user-select:none; }
+.nomination-candidates { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:18px; width:min(1100px,100%); margin:34px auto 0; padding:10px max(20px,calc((100% - 980px)/2)) 18px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:none; touch-action:pan-x; user-select:none; }
 .nomination-candidates::-webkit-scrollbar { display:none; }
+.nomination-candidates.is-recentering { scroll-behavior:auto!important; }
 .nomination-candidates { cursor:grab; }
-.nomination-candidates.is-dragging { cursor:grabbing; scroll-snap-type:none; }
+.nomination-candidates.is-dragging { cursor:grabbing; scroll-snap-type:none; scroll-behavior:auto; }
 .nomination-candidates .candidate { flex:0 0 164px; width:164px; min-height:190px; padding:0 0 8px; scroll-snap-align:center; }
 .nomination-candidates .candidate-avatar { flex-basis:148px; width:148px; height:148px; }
 .nomination-candidates img { pointer-events:none; user-select:none; }
