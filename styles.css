@@ -258,3 +258,25 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
   .nomination-candidates .candidate-avatar { flex-basis:104px; width:104px; height:104px; }
   .nomination-candidates .candidate-name { max-width:112px; font-size:11px; }
 }
+
+/* Keep the active nominee centered while the adjacent nominees frame it. */
+.nomination-candidates .candidate {
+  opacity:.26;
+  transform:scale(.86);
+  transition:opacity .22s ease,transform .22s ease,filter .22s ease;
+  filter:saturate(.55);
+}
+.nomination-candidates .candidate.is-adjacent {
+  opacity:.58;
+  transform:scale(.94);
+  filter:saturate(.78);
+}
+.nomination-candidates .candidate.is-current {
+  opacity:1;
+  transform:scale(1);
+  filter:none;
+}
+.nomination-candidates.is-dragging .candidate { transition:none; }
+.nomination-candidates .candidate:hover { transform:translateY(-3px) scale(.88); }
+.nomination-candidates .candidate.is-current:hover { transform:translateY(-4px) scale(1); }
+.nomination-candidates .candidate.is-adjacent:hover { transform:translateY(-3px) scale(.96); }

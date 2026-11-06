@@ -32,6 +32,8 @@ const progressBar = document.querySelector('#progressBar');
 const submitHint = document.querySelector('#submitHint');
 let toastTimer;
 let countdownTimer;
+let renderedNominationsKey = '';
+let renderedClosedKey = '';
 
 const NOMINATION_DESCRIPTIONS = {
   'legend-year': 'Человек, чьи поступки и истории стали частью Secret Gate в этом году.',
@@ -77,7 +79,7 @@ function updateProgress() {
   submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations || !state.votingAccepting;
   submitHint.textContent = state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
 }
-function updateChoiceUI(nominationId) {
+function updateChoiceUI(nominationId, centerSelected = false) {
   const nomination = state.nominations.find(item => item.id === nominationId);
   const card = grid.querySelector(`[data-nomination-card="${CSS.escape(nominationId)}"]`);
   if (!nomination || !card) return;
@@ -86,10 +88,15 @@ function updateChoiceUI(nominationId) {
   const prompt = card.querySelector('.nomination-prompt');
   prompt.textContent = choice ? `Выбрано: ${selectedName(choice)}` : 'Выбери одного кандидата';
   card.querySelectorAll('.candidate').forEach(button => {
-    const selected = choice?.type === 'existing' && choice.id === button.dataset.person;
+    const selected = !button.classList.contains('is-clone') && choice?.type === 'existing' && choice.id === button.dataset.person;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
   });
+  const carousel = card.querySelector('.nomination-candidates');
+  if (centerSelected && choice?.type === 'existing' && carousel) {
+    const selected = carousel.querySelector(`.candidate[data-person="${CSS.escape(choice.id)}"]:not(.is-clone)`);
+    if (selected) centerCandidate(carousel, selected);
+  }
   updateProgress();
 }
 function playerAlreadyNominated(player, nomination) {
@@ -156,15 +163,33 @@ function render() {
   const sectionHeading = document.querySelector('.section-heading');
   const submitWrap = document.querySelector('.submit-wrap');
   const isClosed = !state.votingAccepting;
+  const nominationsKey = JSON.stringify(state.nominations.map(nomination => [nomination.id, nomination.title, nomination.nominees.map(person => [person.id, person.name, person.avatarUrl, person.description])]));
   closedVoting.hidden = false;
   grid.hidden = isClosed;
   sectionHeading.classList.toggle('is-closed-view', isClosed);
   submitWrap.hidden = isClosed;
-  renderClosedNominations();
+  const closedKey = `${nominationsKey}:${state.votingAccepting}`;
+  if (renderedClosedKey !== closedKey) {
+    renderedClosedKey = closedKey;
+    renderClosedNominations();
+  }
   if (isClosed) {
     updateProgress();
     return;
   }
+  if (renderedNominationsKey === nominationsKey) {
+    state.nominations.forEach(nomination => updateChoiceUI(nomination.id));
+    return;
+  }
+  renderedNominationsKey = nominationsKey;
+  const preservedCards = new Map([...grid.querySelectorAll('.nomination')].map(card => {
+    const id = card.dataset.nominationCard;
+    return [id, {
+      scrollLeft: card.querySelector('.nomination-candidates')?.scrollLeft || 0,
+      inputValue: card.querySelector('.custom-input')?.value || '',
+      inputFocused: document.activeElement === card.querySelector('.custom-input')
+    }];
+  }));
   const nominationCard = nomination => {
     const choice = state.choices.get(nomination.id);
     const isZavoz = nomination.slug?.startsWith('zavoz-year');
@@ -173,17 +198,49 @@ function render() {
     return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
+  preservedCards.forEach((saved, nominationId) => {
+    const card = grid.querySelector(`[data-nomination-card="${CSS.escape(nominationId)}"]`);
+    const input = card?.querySelector('.custom-input');
+    if (input && saved.inputValue) input.value = saved.inputValue;
+    if (input && saved.inputFocused) requestAnimationFrame(() => input.focus());
+  });
   grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
     const candidates = [...carousel.querySelectorAll('.candidate')];
     candidates.forEach((button, index) => {
+      button.dataset.carouselIndex = String(index);
       const order = document.createElement('span');
       order.className = 'candidate-order';
       order.textContent = `${String(index + 1).padStart(2, '0')} / ${String(candidates.length).padStart(2, '0')}`;
       button.querySelector('.candidate-name').before(order);
     });
+    carousel.dataset.count = String(candidates.length);
+    if (candidates.length > 1) {
+      const before = candidates.map(candidate => candidate.cloneNode(true));
+      const after = candidates.map(candidate => candidate.cloneNode(true));
+      before.forEach(candidate => { candidate.classList.add('is-clone'); candidate.classList.remove('selected'); candidate.setAttribute('aria-hidden', 'true'); candidate.setAttribute('aria-pressed', 'false'); candidate.tabIndex = -1; });
+      after.forEach(candidate => { candidate.classList.add('is-clone'); candidate.classList.remove('selected'); candidate.setAttribute('aria-hidden', 'true'); candidate.setAttribute('aria-pressed', 'false'); candidate.tabIndex = -1; });
+      before.reverse().forEach(candidate => carousel.insertBefore(candidate, carousel.firstChild));
+      after.forEach(candidate => carousel.append(candidate));
+    }
+    const selected = state.choices.get(carousel.closest('.nomination').dataset.nominationCard);
+    const initialIndex = selected?.type === 'existing' ? candidates.findIndex(candidate => candidate.dataset.person === selected.id) : 0;
+    const index = initialIndex >= 0 ? initialIndex : 0;
+    carousel.dataset.activeIndex = String(index);
+    const saved = preservedCards.get(carousel.closest('.nomination').dataset.nominationCard);
+    requestAnimationFrame(() => {
+      if (saved) {
+        carousel.scrollLeft = saved.scrollLeft;
+        settleCandidateCarousel(carousel);
+      } else {
+        centerCandidate(carousel, carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`), false);
+        updateCarouselClasses(carousel, index);
+      }
+    });
+    updateCarouselClasses(carousel, index);
   });
   grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
     let dragging = false; let moved = false; let startX = 0; let startScroll = 0;
+    let scrollTimer;
     carousel.addEventListener('pointerdown', event => {
       if (event.pointerType !== 'mouse' || event.button !== 0) return;
       dragging = true; moved = false; startX = event.clientX; startScroll = carousel.scrollLeft;
@@ -193,15 +250,15 @@ function render() {
       if (!dragging) return;
       const delta = event.clientX - startX; if (Math.abs(delta) > 4) moved = true; carousel.scrollLeft = startScroll - delta;
     });
+    carousel.addEventListener('scroll', () => {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => settleCandidateCarousel(carousel), 90);
+    }, { passive: true });
     const finishDrag = event => {
       if (!dragging) return; dragging = false; carousel.classList.remove('is-dragging');
       if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
       if (moved) { carousel.dataset.dragged = 'true'; setTimeout(() => delete carousel.dataset.dragged, 0); }
-      const candidate = [...carousel.querySelectorAll('.candidate')].reduce((closest, item) => {
-        const distance = Math.abs(item.offsetLeft + item.offsetWidth / 2 - (carousel.scrollLeft + carousel.clientWidth / 2));
-        return !closest || distance < closest.distance ? { item, distance } : closest;
-      }, null);
-      candidate?.item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      settleCandidateCarousel(carousel);
     };
     carousel.addEventListener('pointerup', finishDrag); carousel.addEventListener('pointercancel', finishDrag);
   });
@@ -213,7 +270,7 @@ function render() {
     state.choices.set(nomination.id, { type: 'existing', id: person.id, name: person.name });
     const customInput = grid.querySelector(`[data-custom-nomination="${CSS.escape(nomination.id)}"]`);
     if (customInput) { customInput.value = ''; customInput.parentElement.querySelector('.person-suggestions').hidden = true; }
-    updateChoiceUI(nomination.id);
+    updateChoiceUI(nomination.id, true);
   }));
   grid.querySelectorAll('[data-custom-nomination]').forEach(input => input.addEventListener('input', () => {
     const nominationId = input.dataset.customNomination;
@@ -222,6 +279,43 @@ function render() {
     updateChoiceUI(nominationId);
   }));
   updateProgress();
+}
+function centerCandidate(carousel, candidate, smooth = true) {
+  if (!candidate) return;
+  const left = candidate.offsetLeft - (carousel.clientWidth - candidate.offsetWidth) / 2;
+  carousel.scrollTo({ left, behavior: smooth ? 'smooth' : 'auto' });
+}
+function updateCarouselClasses(carousel, activeIndex) {
+  const count = Number(carousel.dataset.count);
+  if (!count) return;
+  carousel.dataset.activeIndex = String(activeIndex);
+  const candidates = [...carousel.querySelectorAll('.candidate')];
+  const center = carousel.scrollLeft + carousel.clientWidth / 2;
+  const currentIndex = candidates.reduce((closest, item, index) => {
+    const distance = Math.abs(item.offsetLeft + item.offsetWidth / 2 - center);
+    return !closest || distance < closest.distance ? { index, distance } : closest;
+  }, null)?.index;
+  candidates.forEach((candidate, index) => {
+    const distance = currentIndex == null ? Infinity : Math.abs(index - currentIndex);
+    candidate.classList.toggle('is-current', distance === 0);
+    candidate.classList.toggle('is-adjacent', distance === 1);
+  });
+}
+function settleCandidateCarousel(carousel) {
+  const candidates = [...carousel.querySelectorAll('.candidate')];
+  const centered = candidates.reduce((closest, item) => {
+    const distance = Math.abs(item.offsetLeft + item.offsetWidth / 2 - (carousel.scrollLeft + carousel.clientWidth / 2));
+    return !closest || distance < closest.distance ? { item, distance } : closest;
+  }, null)?.item;
+  if (!centered) return;
+  const count = Number(carousel.dataset.count);
+  const index = Number(centered.dataset.carouselIndex);
+  updateCarouselClasses(carousel, index);
+  if (centered.classList.contains('is-clone') && count > 1) {
+    const realCandidate = carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`);
+    centerCandidate(carousel, realCandidate, false);
+    requestAnimationFrame(() => updateCarouselClasses(carousel, index));
+  }
 }
 function renderClosedNominations() {
   const slide = document.querySelector('#closedNominationSlide');
