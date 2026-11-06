@@ -68,7 +68,7 @@ function escapeHTML(value) { return String(value).replace(/[&<>'"]/g, character 
 function avatarMarkup(person) {
   const initial = escapeHTML(String(person.name || '?').trim().charAt(0).toUpperCase() || '?');
   const url = typeof person.avatarUrl === 'string' && /^https?:\/\//i.test(person.avatarUrl) ? ` src="${escapeHTML(person.avatarUrl)}"` : '';
-  return `<span class="candidate-avatar ${url ? 'has-image' : ''}"><b>${initial}</b>${url ? `<img${url} alt="" loading="lazy">` : ''}</span>`;
+  return `<span class="candidate-avatar ${url ? 'has-image' : ''}"><b>${initial}</b>${url ? `<img${url} alt="" loading="lazy" draggable="false">` : ''}</span>`;
 }
 function toast(message) { const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3400); }
 function selectedName(choice) { return choice?.type === 'custom' ? choice.name : choice?.name; }
@@ -270,16 +270,17 @@ function render() {
     updateCarouselClasses(carousel, index);
   });
   grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
-    let dragging = false; let moved = false; let startX = 0; let startScroll = 0;
+    let dragging = false; let moved = false; let startX = 0; let startScroll = 0; let pressedCandidate = null;
     let scrollTimer;
+    carousel.addEventListener('dragstart', event => event.preventDefault());
     carousel.addEventListener('pointerdown', event => {
       if (event.pointerType !== 'mouse' || event.button !== 0) return;
-      dragging = true; moved = false; startX = event.clientX; startScroll = carousel.scrollLeft;
+      dragging = true; moved = false; pressedCandidate = event.target.closest('.candidate'); startX = event.clientX; startScroll = carousel.scrollLeft;
       carousel.classList.add('is-dragging'); carousel.setPointerCapture(event.pointerId);
     });
     carousel.addEventListener('pointermove', event => {
       if (!dragging) return;
-      const delta = event.clientX - startX; if (Math.abs(delta) > 4) moved = true; carousel.scrollLeft = startScroll - delta;
+      const delta = event.clientX - startX; if (Math.abs(delta) > 8) moved = true; carousel.scrollLeft = startScroll - delta;
     });
     carousel.addEventListener('scroll', () => {
       clearTimeout(scrollTimer);
@@ -288,9 +289,11 @@ function render() {
     const finishDrag = event => {
       if (!dragging) return; dragging = false; carousel.classList.remove('is-dragging');
       if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
+      if (!moved && pressedCandidate && !pressedCandidate.classList.contains('is-clone')) pressedCandidate.click();
+      pressedCandidate = null;
       if (moved) {
         carousel.dataset.dragged = 'true';
-        setTimeout(() => delete carousel.dataset.dragged, 250);
+        setTimeout(() => delete carousel.dataset.dragged, 80);
       }
       settleCandidateCarousel(carousel);
     };
@@ -310,7 +313,15 @@ function render() {
       const current = Number(carousel.dataset.activeIndex || 0);
       const index = (current + offset + count) % count;
       carousel.dataset.activeIndex = String(index);
-      centerCandidate(carousel, carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`));
+      const wrappingForward = offset > 0 && current === count - 1;
+      const wrappingBackward = offset < 0 && current === 0;
+      const cloneTargets = [...carousel.querySelectorAll(`.candidate[data-carousel-index="${index}"].is-clone`)];
+      const target = wrappingForward
+        ? cloneTargets.at(-1)
+        : wrappingBackward
+          ? cloneTargets[0]
+          : carousel.querySelector(`.candidate[data-carousel-index="${index}"]:not(.is-clone)`);
+      centerCandidate(carousel, target);
       syncDots(index);
     };
     slider.querySelector('[data-candidate-prev]')?.addEventListener('click', () => move(-1));
