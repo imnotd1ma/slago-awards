@@ -156,12 +156,12 @@ function render() {
   const sectionHeading = document.querySelector('.section-heading');
   const submitWrap = document.querySelector('.submit-wrap');
   const isClosed = !state.votingAccepting;
-  closedVoting.hidden = !isClosed;
+  closedVoting.hidden = false;
   grid.hidden = isClosed;
   sectionHeading.classList.toggle('is-closed-view', isClosed);
   submitWrap.hidden = isClosed;
+  renderClosedNominations();
   if (isClosed) {
-    renderClosedNominations();
     updateProgress();
     return;
   }
@@ -173,7 +173,40 @@ function render() {
     return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `Выбрано: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
+  grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
+    const candidates = [...carousel.querySelectorAll('.candidate')];
+    candidates.forEach((button, index) => {
+      const order = document.createElement('span');
+      order.className = 'candidate-order';
+      order.textContent = `${String(index + 1).padStart(2, '0')} / ${String(candidates.length).padStart(2, '0')}`;
+      button.querySelector('.candidate-name').before(order);
+    });
+  });
+  grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
+    let dragging = false; let moved = false; let startX = 0; let startScroll = 0;
+    carousel.addEventListener('pointerdown', event => {
+      if (event.pointerType !== 'mouse' || event.button !== 0) return;
+      dragging = true; moved = false; startX = event.clientX; startScroll = carousel.scrollLeft;
+      carousel.classList.add('is-dragging'); carousel.setPointerCapture(event.pointerId);
+    });
+    carousel.addEventListener('pointermove', event => {
+      if (!dragging) return;
+      const delta = event.clientX - startX; if (Math.abs(delta) > 4) moved = true; carousel.scrollLeft = startScroll - delta;
+    });
+    const finishDrag = event => {
+      if (!dragging) return; dragging = false; carousel.classList.remove('is-dragging');
+      if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
+      if (moved) { carousel.dataset.dragged = 'true'; setTimeout(() => delete carousel.dataset.dragged, 0); }
+      const candidate = [...carousel.querySelectorAll('.candidate')].reduce((closest, item) => {
+        const distance = Math.abs(item.offsetLeft + item.offsetWidth / 2 - (carousel.scrollLeft + carousel.clientWidth / 2));
+        return !closest || distance < closest.distance ? { item, distance } : closest;
+      }, null);
+      candidate?.item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    };
+    carousel.addEventListener('pointerup', finishDrag); carousel.addEventListener('pointercancel', finishDrag);
+  });
   grid.querySelectorAll('.candidate').forEach(button => button.addEventListener('click', () => {
+    if (button.closest('.nomination-candidates')?.dataset.dragged === 'true') return;
     const nomination = state.nominations.find(item => item.id === button.dataset.nomination);
     const person = nomination?.nominees.find(item => item.id === button.dataset.person);
     if (!nomination || !person) return;
@@ -219,6 +252,20 @@ function renderClosedNominations() {
   renderSlide(previousSlide, getNomination(-1), true);
   renderSlide(slide, getNomination(0));
   renderSlide(nextSlide, getNomination(1), true);
+  [previousSlide, slide, nextSlide].forEach((target, offset) => {
+    const nomination = getNomination(offset - 1);
+    target.tabIndex = state.votingAccepting ? 0 : -1;
+    target.setAttribute('role', state.votingAccepting ? 'button' : 'article');
+    if (state.votingAccepting) target.setAttribute('aria-label', `Перейти к голосованию: ${nomination.title}`);
+    else target.removeAttribute('aria-label');
+    target.onclick = () => {
+      if (!state.votingAccepting) return;
+      grid.querySelector(`[data-nomination-card="${CSS.escape(nomination.id)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    target.onkeydown = event => {
+      if (state.votingAccepting && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); target.click(); }
+    };
+  });
   slides.classList.remove('is-next', 'is-previous');
   if (state.closedDirection) {
     void slides.offsetWidth;

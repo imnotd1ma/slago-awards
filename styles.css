@@ -83,7 +83,7 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
 .nomination:hover { transform:none; border-color:rgba(248,219,149,.3); background:rgba(255,255,255,.012); box-shadow:none; }
 .nomination.chosen { background:linear-gradient(90deg,transparent,rgba(248,219,149,.035),transparent); }
 .nomination-index { margin:0 0 8px!important; color:rgba(248,219,149,.66)!important; font-family:Georgia,serif; font-size:13px; letter-spacing:1px; }
-.nomination h3 { max-width:none; margin:0; color:#fff1cf; font:600 34px Georgia,serif; letter-spacing:0; line-height:1.2; }
+.nomination h3 { max-width:none; margin:0; color:#fff1cf; font:600 34px Unbounded, sans-serif; letter-spacing:0; line-height:1.2; }
 .nomination-prompt { min-height:0!important; margin:8px 0 0!important; font-size:12px!important; }
 .nomination-candidates { width:min(1100px,100%); margin:34px auto 0; display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:26px 34px; }
 .candidate { position:relative; width:132px; min-height:0; padding:0; display:flex; flex:0 1 132px; flex-direction:column; align-items:center; justify-content:flex-start; gap:10px; border:0; background:transparent; text-align:center; }
@@ -234,10 +234,27 @@ body:before { content:""; position:fixed; z-index:-4; inset:0; pointer-events:no
   .countdown-panel strong { font-size:22px; }
   .ballot-section > .section-heading,.submit-wrap { margin-left:20px; margin-right:20px; }
   .nomination { padding:42px 18px 48px; }
-  .nomination h3 { font-size:27px; }
+  .nomination h3 { font-size:27px;}
   .nomination-candidates { gap:22px 12px; margin-top:26px; }
   .candidate { width:96px; flex-basis:96px; gap:8px; }
   .candidate .candidate-avatar { flex-basis:88px; width:88px; height:88px; }
   .candidate-name { max-width:96px; font-size:10px; }
   .candidate i { right:0; }
+}
+
+/* Candidate carousel in the open ballot */
+.nomination-candidates { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:18px; width:min(1100px,100%); margin:34px auto 0; padding:10px max(20px,calc((100% - 980px)/2)) 18px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:thin; scrollbar-color:rgba(248,219,149,.48) transparent; touch-action:pan-x; }
+.nomination-candidates.is-dragging { cursor:grabbing; scroll-snap-type:none; user-select:none; }
+.nomination-candidates .candidate { flex:0 0 164px; width:164px; min-height:190px; padding:0 0 8px; scroll-snap-align:center; }
+.nomination-candidates .candidate-avatar { flex-basis:148px; width:148px; height:148px; }
+.candidate-order { color:rgba(248,219,149,.68); font-size:10px; font-weight:800; letter-spacing:1px; }
+.nomination-candidates .candidate-name { max-width:164px; font-size:12px; }
+.nomination-candidates .candidate i { top:4px; right:4px; }
+.closed-nomination-slide[role="button"] { cursor:pointer; }
+.closed-nomination-slide[role="button"]:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+@media(max-width:760px) {
+  .nomination-candidates { gap:14px; padding-left:calc((100% - 96px)/2); padding-right:calc((100% - 96px)/2); }
+  .nomination-candidates .candidate { flex-basis:112px; width:112px; min-height:142px; }
+  .nomination-candidates .candidate-avatar { flex-basis:104px; width:104px; height:104px; }
+  .nomination-candidates .candidate-name { max-width:112px; font-size:11px; }
 }
