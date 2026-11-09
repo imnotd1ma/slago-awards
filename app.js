@@ -397,10 +397,25 @@ function centerCandidate(carousel, candidate, smooth = true) {
   if (!candidate) return;
   const left = candidate.offsetLeft - (carousel.clientWidth - candidate.offsetWidth) / 2;
   if (smooth) {
-    clearTimeout(carousel._smoothTimer);
+    cancelAnimationFrame(carousel._scrollFrame);
     carousel.dataset.animating = 'true';
-    carousel.scrollTo({ left, behavior: 'smooth' });
-    carousel._smoothTimer = setTimeout(() => { delete carousel.dataset.animating; settleCandidateCarousel(carousel); }, 500);
+    const start = carousel.scrollLeft;
+    const distance = left - start;
+    const startedAt = performance.now();
+    const duration = 180;
+    const animate = now => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - (1 - progress) ** 3;
+      carousel.scrollLeft = start + distance * eased;
+      if (progress < 1) {
+        carousel._scrollFrame = requestAnimationFrame(animate);
+        return;
+      }
+      carousel.scrollLeft = left;
+      delete carousel.dataset.animating;
+      settleCandidateCarousel(carousel);
+    };
+    carousel._scrollFrame = requestAnimationFrame(animate);
     return;
   }
   carousel.classList.add('is-recentering');
