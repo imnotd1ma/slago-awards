@@ -21,7 +21,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, remoteNominations: false, votingAccepting: false, startsAt: null, endsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], choices: new Map(), user: null, voteSubmitted: false, remoteNominations: false, votingAccepting: false, startsAt: null, endsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const adminLink = document.querySelector('#adminLink');
@@ -76,8 +76,8 @@ function updateProgress() {
   const count = state.choices.size;
   progressText.textContent = `${count} из ${state.nominations.length} выбрано`;
   progressBar.style.width = `${count / state.nominations.length * 100}%`;
-  submitButton.disabled = count !== state.nominations.length || !state.user || !state.remoteNominations || !state.votingAccepting;
-  submitHint.textContent = state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
+  submitButton.disabled = state.voteSubmitted || count !== state.nominations.length || !state.user || !state.remoteNominations || !state.votingAccepting;
+  submitHint.textContent = state.voteSubmitted ? 'Твой бюллетень уже отправлен. Выбор нельзя изменить.' : state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
 }
 function updateChoiceUI(nominationId, centerSelected = false) {
   const nomination = state.nominations.find(item => item.id === nominationId);
@@ -91,7 +91,10 @@ function updateChoiceUI(nominationId, centerSelected = false) {
     const selected = !button.classList.contains('is-clone') && choice?.type === 'existing' && choice.id === button.dataset.person;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
+    button.disabled = state.voteSubmitted;
   });
+  const customInput = card.querySelector('[data-custom-nomination]');
+  if (customInput) customInput.disabled = state.voteSubmitted;
   const carousel = card.querySelector('.nomination-candidates');
   if (centerSelected && choice?.type === 'existing' && carousel) {
     const selected = carousel.querySelector(`.candidate[data-person="${CSS.escape(choice.id)}"]:not(.is-clone)`);
@@ -165,15 +168,15 @@ function render() {
   const isClosed = !state.votingAccepting;
   const nominationsKey = JSON.stringify(state.nominations.map(nomination => [nomination.id, nomination.title, nomination.nominees.map(person => [person.id, person.name, person.avatarUrl, person.description])]));
   closedVoting.hidden = false;
-  grid.hidden = isClosed;
+  grid.hidden = isClosed && !state.voteSubmitted;
   sectionHeading.classList.toggle('is-closed-view', isClosed);
-  submitWrap.hidden = isClosed;
+  submitWrap.hidden = isClosed || state.voteSubmitted;
   const closedKey = `${nominationsKey}:${state.votingAccepting}`;
   if (renderedClosedKey !== closedKey) {
     renderedClosedKey = closedKey;
     renderClosedNominations();
   }
-  if (isClosed) {
+  if (isClosed && !state.voteSubmitted) {
     updateProgress();
     return;
   }
@@ -574,6 +577,7 @@ async function loadNominations() {
   }
   reconcileCrossChoices();
   state.remoteNominations = true; render();
+  if (state.user) await loadMyVote();
 }
 let playersRefreshTimer;
 function schedulePlayersRefresh() {
@@ -593,7 +597,28 @@ async function loadPlayers() {
   reconcileCrossChoices();
   render();
 }
-async function syncUser() { if (!supabaseClient) return; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: isAdmin, error } = await supabaseClient.rpc('is_slago_admin'); adminLink.hidden = error || isAdmin !== true; } else if (adminLink) adminLink.hidden = true; updateProgress(); }
+async function syncUser() { if (!supabaseClient) return; const previousUserId = state.user?.id; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; if (previousUserId !== state.user?.id) { state.choices.clear(); state.voteSubmitted = false; render(); } authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: isAdmin, error } = await supabaseClient.rpc('is_slago_admin'); adminLink.hidden = error || isAdmin !== true; } else if (adminLink) adminLink.hidden = true; await loadMyVote(); updateProgress(); }
+async function loadMyVote() {
+  if (!supabaseClient || !state.user) {
+    state.voteSubmitted = false;
+    return;
+  }
+  const { data, error } = await supabaseClient.rpc('get_my_slago_votes');
+  if (error) { console.warn('Не удалось загрузить твой бюллетень:', error); return; }
+  if (!Array.isArray(data) || !data.length) { state.voteSubmitted = false; render(); updateProgress(); return; }
+  const bySlug = new Map(state.nominations.map(item => [item.slug, item]));
+  state.choices.clear();
+  for (const vote of data) {
+    const nomination = bySlug.get(vote.nomination_slug);
+    if (!nomination) continue;
+    state.choices.set(nomination.id, vote.nominee_id
+      ? { type: 'existing', id: vote.nominee_id, name: vote.nominee_name }
+      : { type: 'cross', id: null, name: vote.custom_nominee });
+  }
+  state.voteSubmitted = true;
+  render();
+  updateProgress();
+}
 async function loadVotingStatus() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.rpc('get_slago_vote_status');
@@ -622,8 +647,8 @@ submitButton.addEventListener('click', async () => {
   submitButton.disabled = true;
   const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'cross' ? choice.name : null, custom_nominee_discord_id: choice.type === 'cross' ? choice.discordId || null : null }));
   const { error } = await supabaseClient.from('slago_votes').insert(rows);
-  if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : error.message.includes('VOTING_CLOSED') ? 'Голосование закрыто.' : `Не удалось отправить: ${error.message}`); await loadVotingStatus(); updateProgress(); return; }
-  toast('Голос принят. Спасибо за выбор!'); submitHint.textContent = 'Твой бюллетень уже отправлен.'; grid.querySelectorAll('.candidate, [data-custom-nomination]').forEach(control => control.disabled = true);
+  if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : error.message.includes('VOTING_CLOSED') ? 'Голосование закрыто.' : `Не удалось отправить: ${error.message}`); if (error.code === '23505') await loadMyVote(); await loadVotingStatus(); updateProgress(); return; }
+  state.voteSubmitted = true; toast('Голос принят. Спасибо за выбор!'); render(); updateProgress();
 });
 render();
 document.querySelector('#nominationPrev').addEventListener('click', () => { state.closedDirection = -1; state.closedSlide--; renderClosedNominations(); });
