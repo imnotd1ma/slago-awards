@@ -990,13 +990,7 @@ footer {
 
 /* Awards 2026 visual upgrade */
 body {
-  background: radial-gradient(
-    circle at 50% -20%,
-    #183c89 0%,
-    #09153c 32%,
-    #04091d 71%,
-    #02050f 100%
-  );
+  background: #03091e;
 }
 body:before {
   content: "";
@@ -1005,11 +999,6 @@ body:before {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(
-      ellipse 70% 34% at 50% 4%,
-      rgba(255, 216, 131, 0.12),
-      transparent 72%
-    ),
     radial-gradient(
       ellipse 50% 38% at 90% 80%,
       rgba(104, 84, 255, 0.13),
@@ -1023,6 +1012,7 @@ body:before {
 .aurora-one {
   top: -22vw;
   left: -15vw;
+  opacity: 0.12;
 }
 .aurora-two {
   top: 26vw;
@@ -1502,11 +1492,13 @@ body:before {
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(248, 219, 149, 0.2),
-    rgba(62, 132, 255, 0.13) 38%,
-    transparent 72%
+    rgba(48, 151, 255, 0.62),
+    rgba(18, 102, 255, 0.34) 38%,
+    rgba(20, 87, 220, 0.12) 58%,
+    transparent 74%
   );
-  filter: blur(13px);
+  filter: blur(22px);
+  transform: scale(1.5);
 }
 .trophy {
   width: auto;
@@ -1529,7 +1521,8 @@ body:before {
   height: 510px;
   object-fit: contain;
   filter: drop-shadow(0 14px 28px rgba(1, 5, 23, 0.58))
-    drop-shadow(0 0 28px rgba(248, 219, 149, 0.2));
+    drop-shadow(0 0 28px rgba(22, 121, 255, 0.4))
+    drop-shadow(0 0 68px rgba(16, 100, 255, 0.42));
 }
 .hero-emblem h1 {
   position: absolute;
