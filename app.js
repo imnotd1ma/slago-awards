@@ -681,4 +681,58 @@ document.querySelector('#nominationNext').addEventListener('click', () => { stat
 countdownTimer = setInterval(updateCountdown, 1000);
 if (supabaseClient) { supabaseClient.auth.onAuthStateChange(() => syncUser()); loadNominations().catch(error => { console.warn('Не удалось загрузить номинации:', error); }); loadPlayers().catch(error => console.warn('Не удалось загрузить игроков:', error)); loadVotingStatus(); setInterval(loadVotingStatus, 30000); subscribeToNominationChanges(); syncUser().catch(error => console.warn('Не удалось проверить сессию:', error)); }
 else if (isConfigured) { state.setupMessage = 'Supabase не загрузился. Открой сайт через Live Server и проверь интернет/CDN.'; render(); }
+function initCursorStars() {
+  const field = document.querySelector('.star-field');
+  if (!field || matchMedia('(pointer: coarse), (prefers-reduced-motion: reduce)').matches) return;
+
+  const stars = Array.from({ length: 72 }, () => {
+    const star = document.createElement('i');
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    star.className = 'cursor-star';
+    star.style.left = `${x}%`;
+    star.style.top = `${y}%`;
+    star.dataset.x = x;
+    star.dataset.y = y;
+    field.append(star);
+    return star;
+  });
+
+  let pointer = null;
+  let frame = 0;
+  const repel = () => {
+    frame = 0;
+    const radius = 180;
+    for (const star of stars) {
+      let pushX = 0;
+      let pushY = 0;
+      if (pointer) {
+        const dx = star.dataset.x / 100 * innerWidth - pointer.x;
+        const dy = star.dataset.y / 100 * innerHeight - pointer.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < radius && distance > 0) {
+          const push = (1 - distance / radius) * 58;
+          pushX = dx / distance * push;
+          pushY = dy / distance * push;
+        }
+      }
+      star.style.setProperty('--push-x', `${pushX.toFixed(1)}px`);
+      star.style.setProperty('--push-y', `${pushY.toFixed(1)}px`);
+    }
+  };
+  const scheduleRepel = () => {
+    if (!frame) frame = requestAnimationFrame(repel);
+  };
+
+  window.addEventListener('pointermove', event => {
+    if (event.pointerType === 'touch') return;
+    pointer = { x: event.clientX, y: event.clientY };
+    scheduleRepel();
+  }, { passive: true });
+  window.addEventListener('pointerleave', () => {
+    pointer = null;
+    scheduleRepel();
+  });
+}
+initCursorStars();
 window.addEventListener('load', () => document.body.classList.add('is-ready'));
