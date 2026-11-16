@@ -78,7 +78,12 @@ function renderHistory() {
   if (!currentData) return;
   const nominationId = $('#historyFilter').value;
   const votes = currentData.votes.filter(vote => !nominationId || vote.nomination_id === nominationId);
-  $('#historyRows').innerHTML = votes.length ? votes.map(vote => `<tr><td>${new Date(vote.created_at).toLocaleString('ru-RU')}</td><td><span class="history-person">${vote.avatar_url ? `<img src="${escapeHTML(vote.avatar_url)}" alt="" loading="lazy">` : ''}<span>${escapeHTML(vote.voter_name)}${vote.discord_username ? `<small>${escapeHTML(vote.discord_username)}</small>` : ''}</span></span></td><td>${escapeHTML(vote.nomination_title)}</td><td>${escapeHTML(vote.nominee_name || '—')}</td></tr>`).join('') : '<tr><td colspan="4" class="empty-history">Голосов пока нет</td></tr>';
+  $('#historyRows').innerHTML = votes.length ? votes.map(vote => {
+    const discordLogin = vote.discord_username || '';
+    const voterLabel = discordLogin || vote.voter_name;
+    const secondaryLabel = discordLogin && vote.voter_name !== discordLogin ? vote.voter_name : '';
+    return `<tr><td>${new Date(vote.created_at).toLocaleString('ru-RU')}</td><td><span class="history-person">${vote.avatar_url ? `<img src="${escapeHTML(vote.avatar_url)}" alt="" loading="lazy">` : ''}<span>${escapeHTML(voterLabel)}${secondaryLabel ? `<small>${escapeHTML(secondaryLabel)}</small>` : ''}</span></span></td><td>${escapeHTML(vote.nomination_title)}</td><td>${escapeHTML(vote.nominee_name || '—')}</td></tr>`;
+  }).join('') : '<tr><td colspan="4" class="empty-history">Голосов пока нет</td></tr>';
 }
 async function refresh() {
   if (!client) { setMessage('Supabase не загрузился. Обнови страницу.', true); return; }
