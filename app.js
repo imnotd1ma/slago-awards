@@ -1,5 +1,5 @@
 const FALLBACK_NOMINATIONS = [
-  ['legend-year', 'Легенда года', ['Максим Ветш', 'Ярослав Ханчиков', 'Леня Шоколадный-Гений', 'Дмитрий Липтон', 'Семён Мазалов', 'Ярослав Блессед', 'Илья Монеси', 'Михаил Потужнич', 'Геннадий Арбузов', 'Павлик', 'Ваня Шпага', 'Максим Лосс', 'Антон Шурупов', 'Даня Ед']],
+  ['legend-year', 'Легенда года', []],
   ['meme-year', 'Мем года', ['Дима Шуруп', 'Матвей tea_bag', 'Илья Монеси', 'Павлик']],
   ['active-year', 'Актив года', ['Григорий Грейроков', 'Максим Ветш', 'Матвей tea_bag', 'Владислав Яторович', 'Павлик']],
   ['xer-year', 'Ксер года', ['Дмитрий Клатчер', 'Максим Лосс', 'Ваня Шпага', 'Григорий Грейроков', 'Матвей tea_bag']],
@@ -22,7 +22,7 @@ if (isConfigured && window.supabase?.createClient) {
   try { supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (error) { console.error('Supabase не запустился:', error); }
 }
 
-const state = { nominations: FALLBACK_NOMINATIONS, players: [], playersLoaded: false, choices: new Map(), user: null, voteSubmitted: false, remoteNominations: false, votingAccepting: false, startsAt: null, endsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
+const state = { nominations: FALLBACK_NOMINATIONS, players: [], playersLoaded: false, choices: new Map(), existingVoteNominationIds: new Set(), user: null, voteSubmitted: false, remoteNominations: false, votingAccepting: false, startsAt: null, endsAt: null, setupMessage: '', closedSlide: 0, closedDirection: 0 };
 const grid = document.querySelector('#nominationGrid');
 const authButton = document.querySelector('#authButton');
 const adminLink = document.querySelector('#adminLink');
@@ -92,11 +92,18 @@ function restoreBallotDraft() {
 }
 function updateProgress() {
   const count = state.choices.size;
+  const legend = state.nominations.find(item => item.slug === 'legend-year');
+  const canAddLegend = state.voteSubmitted && legend && !state.existingVoteNominationIds.has(legend.id) && state.choices.has(legend.id);
+  const canSubmitInitialBallot = !state.voteSubmitted && count === state.nominations.length;
   progressText.textContent = `${count} из ${state.nominations.length} выбрано`;
   progressBar.style.width = `${count / state.nominations.length * 100}%`;
-  submitButton.disabled = state.voteSubmitted || count !== state.nominations.length || !state.user || !state.remoteNominations || !state.votingAccepting;
-  submitHint.textContent = state.voteSubmitted ? 'Твой бюллетень уже отправлен. Выбор нельзя изменить.' : state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
-  ballotAuthButton.hidden = Boolean(state.user) || state.voteSubmitted;
+  submitButton.disabled = (!canSubmitInitialBallot && !canAddLegend) || !state.user || !state.remoteNominations || !state.votingAccepting;
+  submitButton.textContent = state.voteSubmitted ? 'Добавить голос за легенду' : 'Отправить бюллетень';
+  submitHint.textContent = state.setupMessage || (!state.votingAccepting ? 'Голосование сейчас закрыто или ещё не началось.' : !state.user ? 'Войди через Discord, чтобы твой голос был засчитан.' : state.voteSubmitted ? canAddLegend ? 'Можно добавить только голос за «Легенду года».' : 'Бюллетень уже отправлен.' : count === state.nominations.length ? 'Всё готово. Проверь выбор и отправь бюллетень.' : 'Выбери кандидата в каждой номинации.');
+  ballotAuthButton.hidden = Boolean(state.user);
+  const submitWrap = document.querySelector('.submit-wrap');
+  const legendAlreadyVoted = legend && state.existingVoteNominationIds.has(legend.id);
+  submitWrap.hidden = !state.votingAccepting || (state.voteSubmitted && legendAlreadyVoted);
 }
 function updateChoiceUI(nominationId, centerSelected = false) {
   const nomination = state.nominations.find(item => item.id === nominationId);
@@ -110,10 +117,10 @@ function updateChoiceUI(nominationId, centerSelected = false) {
     const selected = !button.classList.contains('is-clone') && choice?.type === 'existing' && choice.id === button.dataset.person;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
-    button.disabled = state.voteSubmitted;
+    button.disabled = state.voteSubmitted && state.existingVoteNominationIds.has(nominationId);
   });
   const customInput = card.querySelector('[data-custom-nomination]');
-  if (customInput) customInput.disabled = state.voteSubmitted;
+  if (customInput) customInput.disabled = state.voteSubmitted && state.existingVoteNominationIds.has(nominationId);
   saveBallotDraft();
   const carousel = card.querySelector('.nomination-candidates');
   if (centerSelected && choice?.type === 'existing' && carousel) {
@@ -131,6 +138,13 @@ function playerAlreadyNominated(player, nomination) {
       const normalized = name?.trim().toLocaleLowerCase('ru');
       return normalized && (normalized === username || normalized === discordUsername);
     }));
+}
+function isSelfVote(nomination, choice) {
+  if (nomination.slug !== 'legend-year' || !state.user) return false;
+  const voterDiscordId = state.user.user_metadata?.provider_id || state.user.user_metadata?.sub;
+  if (!voterDiscordId) return false;
+  const nominee = nomination.nominees.find(person => person.id === choice.id);
+  return (nominee?.discordId || choice.discordId) === voterDiscordId;
 }
 function reconcileCrossChoices() {
   for (const [nominationId, choice] of state.choices) {
@@ -191,7 +205,7 @@ function render() {
   closedVoting.hidden = false;
   grid.hidden = isClosed && !state.voteSubmitted;
   sectionHeading.classList.toggle('is-closed-view', isClosed);
-  submitWrap.hidden = isClosed || state.voteSubmitted;
+  submitWrap.hidden = isClosed || (state.voteSubmitted && state.nominations.some(item => item.slug === 'legend-year' && state.existingVoteNominationIds.has(item.id)));
   const closedKey = `${nominationsKey}:${state.votingAccepting}`;
   if (renderedClosedKey !== closedKey) {
     renderedClosedKey = closedKey;
@@ -219,7 +233,8 @@ function render() {
     const isZavoz = nomination.slug?.startsWith('zavoz-year');
     const candidates = nomination.nominees.map(person => `<button class="candidate ${choice?.type === 'existing' && choice.id === person.id ? 'selected' : ''}" type="button" data-nomination="${escapeHTML(nomination.id)}" data-person="${escapeHTML(person.id)}" aria-pressed="${choice?.type === 'existing' && choice.id === person.id}">${avatarMarkup(person)}<span class="candidate-name">${escapeHTML(person.name)}</span><i>✓</i>${isZavoz && person.description ? `<span class="candidate-description">${escapeHTML(person.description)}</span>` : ''}</button>`).join('');
     const customName = choice?.type === 'cross' ? choice.name : '';
-    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `${choice.type === 'cross' ? 'Другой пользователь' : 'Выбрано'}: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div><label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div></article>`;
+    const customPicker = nomination.slug === 'legend-year' ? '' : `<label class="custom-label" for="custom-${escapeHTML(nomination.id)}">Или выбери другого пользователя</label><div class="custom-picker"><input id="custom-${escapeHTML(nomination.id)}" class="custom-input" data-custom-nomination="${escapeHTML(nomination.id)}" maxlength="70" autocomplete="off" placeholder="Начни вводить имя" value="${escapeHTML(customName)}" /><div class="person-suggestions" role="listbox" hidden></div></div>`;
+    return `<article class="nomination ${choice ? 'chosen' : ''}" data-nomination-card="${escapeHTML(nomination.id)}" style="animation-delay:${nomination.index * 55}ms"><span class="nomination-index">№ ${String(nomination.index).padStart(2, '0')}</span><h3>${escapeHTML(nomination.title)}</h3><p class="nomination-prompt">${choice ? `${choice.type === 'cross' ? 'Другой пользователь' : 'Выбрано'}: ${escapeHTML(selectedName(choice))}` : 'Выбери одного кандидата'}</p><div class="nomination-candidates">${candidates}</div>${customPicker}</article>`;
   };
   grid.innerHTML = state.nominations.map(nominationCard).join('');
   grid.querySelectorAll('.nomination-candidates').forEach(carousel => {
@@ -415,6 +430,7 @@ function render() {
     showOtherNomineeSuggestions(input);
     updateChoiceUI(nominationId);
   }));
+  state.nominations.forEach(nomination => updateChoiceUI(nomination.id));
   updateProgress();
 }
 function centerCandidate(carousel, candidate, smooth = true) {
@@ -584,12 +600,15 @@ function subscribeToNominationChanges() {
 }
 async function loadNominations() {
   if (!supabaseClient) return render();
-  const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
+    const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, is_legend_year_selected, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
   if (error || !data?.length) {
     state.setupMessage = error ? `Бюллетень временный: Supabase не вернул номинации (${error.message}).` : 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
     return render();
   }
-  const nextNominations = data.map((item, index) => ({ id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, description: person.description || '', discordId: person.discord_id, discordUsername: person.discord_username, avatarUrl: person.avatar_url || '' })) }));
+  const nextNominations = data.map((item, index) => {
+    const nominees = (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, description: person.description || '', discordId: person.discord_id, discordUsername: person.discord_username, avatarUrl: person.avatar_url || '', isLegendYearSelected: person.is_legend_year_selected === true }));
+    return { id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: item.slug === 'legend-year' ? nominees.filter(person => person.isLegendYearSelected) : nominees };
+  });
   state.nominations = nextNominations;
   if (!state.voteSubmitted) restoreBallotDraft();
   const activeNominationIds = new Set(nextNominations.map(item => item.id));
@@ -619,24 +638,28 @@ async function loadPlayers() {
   state.playersLoaded = true;
   reconcileCrossChoices();
   render();
+  if (state.user) await loadMyVote();
 }
-async function syncUser() { if (!supabaseClient) return; const previousUserId = state.user?.id; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; if (previousUserId && previousUserId !== state.user?.id) { state.choices.clear(); state.voteSubmitted = false; render(); } authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: isAdmin, error } = await supabaseClient.rpc('is_slago_admin'); adminLink.hidden = error || isAdmin !== true; } else if (adminLink) adminLink.hidden = true; await loadMyVote(); updateProgress(); }
+async function syncUser() { if (!supabaseClient) return; const previousUserId = state.user?.id; const { data: { session } } = await supabaseClient.auth.getSession(); state.user = session?.user ?? null; if (previousUserId && previousUserId !== state.user?.id) { state.choices.clear(); state.existingVoteNominationIds.clear(); state.voteSubmitted = false; render(); } authButton.textContent = state.user ? `Выйти: ${state.user.user_metadata.full_name || state.user.email}` : 'Войти через Discord'; if (state.user && adminLink) { const { data: isAdmin, error } = await supabaseClient.rpc('is_slago_admin'); adminLink.hidden = error || isAdmin !== true; } else if (adminLink) adminLink.hidden = true; await loadMyVote(); updateProgress(); }
 async function loadMyVote() {
   if (!supabaseClient || !state.user) {
     state.voteSubmitted = false;
+    state.existingVoteNominationIds.clear();
     return;
   }
   const { data, error } = await supabaseClient.rpc('get_my_slago_votes');
   if (error) { console.warn('Не удалось загрузить твой бюллетень:', error); return; }
-  if (!Array.isArray(data) || !data.length) { state.voteSubmitted = false; render(); updateProgress(); return; }
+  if (!Array.isArray(data) || !data.length) { state.voteSubmitted = false; state.existingVoteNominationIds.clear(); render(); updateProgress(); return; }
   const bySlug = new Map(state.nominations.map(item => [item.slug, item]));
   state.choices.clear();
+  state.existingVoteNominationIds.clear();
   for (const vote of data) {
     const nomination = bySlug.get(vote.nomination_slug);
     if (!nomination) continue;
+    state.existingVoteNominationIds.add(nomination.id);
     state.choices.set(nomination.id, vote.nominee_id
       ? { type: 'existing', id: vote.nominee_id, name: vote.nominee_name }
-      : { type: 'cross', id: null, name: vote.custom_nominee });
+      : { type: 'cross', id: null, name: state.players.find(player => player.discordId === vote.custom_nominee_discord_id)?.username || vote.custom_nominee, discordId: vote.custom_nominee_discord_id || null });
   }
   state.voteSubmitted = true;
   saveBallotDraft();
@@ -669,11 +692,22 @@ authButton.addEventListener('click', async () => {
 ballotAuthButton.addEventListener('click', () => authButton.click());
 submitButton.addEventListener('click', async () => {
   if (!state.user || !supabaseClient) return;
+  const addingLegend = state.voteSubmitted;
   submitButton.disabled = true;
-  const rows = [...state.choices].map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'cross' ? choice.name : null, custom_nominee_discord_id: choice.type === 'cross' ? choice.discordId || null : null }));
+  const legend = state.nominations.find(item => item.slug === 'legend-year');
+  const selectedChoices = state.voteSubmitted
+    ? (legend && !state.existingVoteNominationIds.has(legend.id) && state.choices.has(legend.id) ? [[legend.id, state.choices.get(legend.id)]] : [])
+    : [...state.choices];
+  if (!state.voteSubmitted && selectedChoices.length !== state.nominations.length) { updateProgress(); return; }
+  const rows = selectedChoices.map(([nomination_id, choice]) => ({ nomination_id, voter_id: state.user.id, nominee_id: choice.type === 'existing' ? choice.id : null, custom_nominee: choice.type === 'cross' ? choice.name : null, custom_nominee_discord_id: choice.type === 'cross' ? choice.discordId || null : null }));
+  const selfVote = rows.some(row => isSelfVote(state.nominations.find(item => item.id === row.nomination_id), state.choices.get(row.nomination_id)));
+  if (selfVote) { toast('За себя в номинации «Легенда года» голосовать нельзя.'); updateProgress(); return; }
   const { error } = await supabaseClient.from('slago_votes').insert(rows);
-  if (error) { toast(error.code === '23505' ? 'Ваш голос уже был принят.' : error.message.includes('VOTING_CLOSED') ? 'Голосование закрыто.' : `Не удалось отправить: ${error.message}`); if (error.code === '23505') await loadMyVote(); await loadVotingStatus(); updateProgress(); return; }
-  state.voteSubmitted = true; saveBallotDraft(); toast('Голос принят. Спасибо за выбор!'); render(); updateProgress();
+  if (error) { toast(error.message.includes('CANNOT_VOTE_FOR_SELF') ? 'За себя в номинации «Легенда года» голосовать нельзя.' : error.code === '23505' ? 'Этот голос уже записан.' : error.message.includes('VOTING_CLOSED') ? 'Голосование закрыто.' : `Не удалось отправить: ${error.message}`); if (error.code === '23505') await loadMyVote(); await loadVotingStatus(); updateProgress(); return; }
+  await loadMyVote();
+  saveBallotDraft();
+  toast(addingLegend ? 'Голос за «Легенду года» добавлен.' : 'Бюллетень отправлен.');
+  render(); updateProgress();
 });
 render();
 document.querySelector('#nominationPrev').addEventListener('click', () => { state.closedDirection = -1; state.closedSlide--; renderClosedNominations(); });
