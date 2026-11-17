@@ -1,17 +1,17 @@
 const FALLBACK_NOMINATIONS = [
   ['legend-year', 'Легенда года', []],
-  ['meme-year', 'Мем года', ['Дима Шуруп', 'Матвей tea_bag', 'Илья Монеси', 'Павлик']],
-  ['active-year', 'Актив года', ['Григорий Грейроков', 'Максим Ветш', 'Матвей tea_bag', 'Владислав Яторович', 'Павлик']],
-  ['xer-year', 'Ксер года', ['Дмитрий Клатчер', 'Максим Лосс', 'Ваня Шпага', 'Григорий Грейроков', 'Матвей tea_bag']],
-  ['golden-burger', 'Премия золотого бургера', ['Ярик Ханчиков', 'Павлик', 'Даня Ед.', 'Семён Мазалов']],
-  ['zavoz-year', 'Завоз года', ['Миша (война с бобруйском)', 'Дима Липтон (10 стаков алмазов)']],
-  ['doter-year', 'Дотер года', ['Даня Ед', 'Владислав Яторович', 'Павлик', 'Леня Шоколадный-Гений', 'Дима Липтон']],
-  ['ivan-zolo-year', 'Иван Золо года', ['Максим Ветш', 'Илья Монеси', 'Айвар', 'Даня Ед']],
-  ['toxic-year', 'Токсик года', ['Геннадий Арбузов', 'Матвей tea_bag', 'Павлик', 'Григорий Грейроков']],
-  ['charisma-year', 'Харизма года', ['Павлик', 'Максим Лосс']],
-  ['good-guy-year', 'Добряк года', ['Илья Монеси', 'Даниил Пенни', 'Дмитрий Клатчер', 'Коля Азотов', 'Ярослав Блессед']],
-  ['sex-symbol-year', 'Секс символ года', ['Меха', 'Матвей tea_bag', 'Семён Мазалов', 'Ярослав Ханчиков', 'Павлик']]
-].map(([id, title, names], index) => ({ id, title, index: index + 1, isFeatured: index < 3, nominees: names.map((name, nomineeIndex) => ({ id: `${id}-${nomineeIndex + 1}`, name, avatarUrl: '' })) }));
+  ['meme-year', 'Мем года', []],
+  ['active-year', 'Актив года', []],
+  ['xer-year', 'Ксер года', []],
+  ['golden-burger', 'Премия золотого бургера', []],
+  ['zavoz-year', 'Завоз года', []],
+  ['doter-year', 'Дотер года', []],
+  ['ivan-zolo-year', 'Иван Золо года', []],
+  ['toxic-year', 'Токсик года', []],
+  ['charisma-year', 'Харизма года', []],
+  ['good-guy-year', 'Добряк года', []],
+  ['sex-symbol-year', 'Секс символ года', []]
+].map(([id, title], index) => ({ id, title, index: index + 1, isFeatured: index < 3, nominees: [] }));
 
 const SUPABASE_URL = 'https://yerptwwacgjftjpsfmdi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_FqrZcdtx_rizOPJBFULWXg_cj7oS9X7';
@@ -600,14 +600,20 @@ function subscribeToNominationChanges() {
 }
 async function loadNominations() {
   if (!supabaseClient) return render();
-    const { data, error } = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, is_legend_year_selected, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
+  let selectionMetadataAvailable = true;
+  let queryResult = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, is_legend_year_selected, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
+  if (queryResult.error?.message.includes('is_legend_year_selected')) {
+    selectionMetadataAvailable = false;
+    queryResult = await supabaseClient.from('slago_nominations').select('id, slug, title, sort_order, is_featured, slago_nominees(id, name, description, discord_id, discord_username, avatar_url, sort_order)').eq('is_active', true).order('sort_order').order('sort_order', { foreignTable: 'slago_nominees' });
+  }
+  const { data, error } = queryResult;
   if (error || !data?.length) {
     state.setupMessage = error ? `Бюллетень временный: Supabase не вернул номинации (${error.message}).` : 'В Supabase пока нет активных номинаций. Выполни supabase/schema.sql.';
     return render();
   }
   const nextNominations = data.map((item, index) => {
     const nominees = (item.slago_nominees || []).map(person => ({ id: person.id, name: person.name, description: person.description || '', discordId: person.discord_id, discordUsername: person.discord_username, avatarUrl: person.avatar_url || '', isLegendYearSelected: person.is_legend_year_selected === true }));
-    return { id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: item.slug === 'legend-year' ? nominees.filter(person => person.isLegendYearSelected) : nominees };
+    return { id: item.id, slug: item.slug, title: item.title, index: index + 1, isFeatured: item.is_featured === true, nominees: item.slug === 'legend-year' && selectionMetadataAvailable ? nominees.filter(person => person.isLegendYearSelected) : nominees };
   });
   state.nominations = nextNominations;
   if (!state.voteSubmitted) restoreBallotDraft();
