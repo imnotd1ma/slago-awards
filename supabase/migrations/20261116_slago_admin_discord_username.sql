@@ -10,8 +10,8 @@ begin
       select jsonb_agg(jsonb_build_object(
         'created_at', v.created_at,
         'voter_id', v.voter_id,
-        'voter_name', coalesce(p.discord_username, identity_data.username, u.raw_user_meta_data ->> 'username', u.raw_user_meta_data ->> 'global_name', p.username, v.voter_id::text),
-        'discord_username', coalesce(p.discord_username, identity_data.username, u.raw_user_meta_data ->> 'username'),
+        'voter_name', coalesce(p.discord_username, identity_data.discord_username, u.raw_user_meta_data ->> 'username', u.raw_user_meta_data ->> 'user_name', u.raw_user_meta_data ->> 'name', u.raw_user_meta_data ->> 'global_name', p.username, v.voter_id::text),
+        'discord_username', coalesce(p.discord_username, identity_data.discord_username, u.raw_user_meta_data ->> 'username', u.raw_user_meta_data ->> 'user_name', u.raw_user_meta_data ->> 'name'),
         'avatar_url', p.avatar_url,
         'nomination_id', v.nomination_id,
         'nomination_title', n.title,
@@ -25,7 +25,11 @@ begin
       left join public.profiles p on p.id = v.voter_id
       left join auth.users u on u.id = v.voter_id
       left join lateral (
-        select i.identity_data ->> 'username' as username
+        select coalesce(
+          i.identity_data ->> 'username',
+          i.identity_data ->> 'user_name',
+          i.identity_data ->> 'name'
+        ) as discord_username
         from auth.identities i
         where i.user_id = v.voter_id and i.provider = 'discord'
         limit 1
