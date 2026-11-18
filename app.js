@@ -129,6 +129,20 @@ function updateChoiceUI(nominationId, centerSelected = false) {
   }
   updateProgress();
 }
+function centerSubmittedChoices() {
+  if (!state.voteSubmitted) return;
+  requestAnimationFrame(() => {
+    state.nominations.forEach(nomination => {
+      const choice = state.choices.get(nomination.id);
+      if (choice?.type !== 'existing') return;
+      const carousel = grid.querySelector(`[data-nomination-card="${CSS.escape(nomination.id)}"] .nomination-candidates`);
+      const selected = carousel?.querySelector(`.candidate[data-person="${CSS.escape(choice.id)}"]:not(.is-clone)`);
+      if (!carousel || !selected) return;
+      centerCandidate(carousel, selected, false);
+      updateCarouselClasses(carousel, Number(selected.dataset.carouselIndex));
+    });
+  });
+}
 function playerAlreadyNominated(player, nomination) {
   const username = player.username?.trim().toLocaleLowerCase('ru');
   const discordUsername = player.discordUsername?.trim().toLocaleLowerCase('ru');
@@ -670,6 +684,7 @@ async function loadMyVote() {
   state.voteSubmitted = true;
   saveBallotDraft();
   render();
+  centerSubmittedChoices();
   updateProgress();
 }
 async function loadVotingStatus() {
